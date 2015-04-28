@@ -1,0 +1,8 @@
+FROM data/repositories
+MAINTAINER "Martin Drohmann <mdrohmann@gmail.com>"
+
+LABEL repositories.base="gitolite on JUERGEN"
+
+ADD /old_repos.tgz /
+
+CMD ["/bin/true"]
