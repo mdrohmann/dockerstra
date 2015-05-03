@@ -5,7 +5,9 @@ MAINTAINER Martin Drohmann <mdrohmann@gmail.com>
 ENV LANG en_US.UTF-8
 ENV LC_ALL en_US.UTF-8
 
-RUN apt-get update -q && \
+ENV DEBIAN_FRONTEND noninteractive
+RUN echo 'Acquire::http { Proxy "http://192.168.1.137:3142"; };' > /etc/apt/apt.conf.d/02proxy && \
+    apt-get update -q && \
     apt-get install --no-install-recommends -qy git-core \
         locales \
         openssh-server \
