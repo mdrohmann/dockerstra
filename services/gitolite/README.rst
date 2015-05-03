@@ -12,7 +12,7 @@ The gitolite server depends on the following images:
    - data/repositories
    - mdrohmann/gitolite
 
-They are build as follows:
+They are built as follows:
 
 ::
 

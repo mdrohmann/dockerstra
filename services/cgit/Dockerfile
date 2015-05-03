@@ -8,6 +8,9 @@ RUN apt-get update -q && \
         libssl-dev \
         lighttpd \
         locales \
+        python2.7-minimal \
+        python-pygments \
+        python-docutils \
     && \
     echo $LANG UTF-8 >> /etc/locale.gen && \
     locale-gen $LANG && \
@@ -17,6 +20,7 @@ RUN apt-get update -q && \
     make install && \
     cd / && \
     rm -rf /tmp/cgit && \
+    ln -s /usr/bin/rst2html /usr/bin/rst2html.py && \
     ln -s /data/cgitrc /etc/cgitrc && \
     apt-get purge -qy --auto-remove build-essential libssl-dev
 

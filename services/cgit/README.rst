@@ -59,6 +59,8 @@ Usage
       '{{ (index $conf 0).HostPort }}'\
       '{{ end }}' cgit
 
+5. 
+
 .. _cgit: http://git.zx2c4.com/cgit/
 
 
