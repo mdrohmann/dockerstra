@@ -1,0 +1,2 @@
+alias FF='sudo docker run --rm -P --link selenium-hub:hub --name=firefox-node-debug -v /tmp/e2e/uploads:/e2e/uploads selenium/node-firefox-debug'
+alias CH='sudo docker run --rm -P --link selenium-hub:hub --name=chrome-node-debug -v /tmp/e2e/uploads:/e2e/uploads selenium/node-chrome-debug'
