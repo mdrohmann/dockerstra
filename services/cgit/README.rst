@@ -31,7 +31,7 @@ file in a host directory, that we want to call.  The default on my computer JUER
 
 ::
 
-   CGIT_DATA_DIR=/home/martin/gistin/gitolite/cgitrc
+   export CGIT_DATA_DIR=/home/martin/gistin/docker/services/cgit/etc
 
 Usage
 -----
@@ -48,7 +48,7 @@ Usage
 
    ::
 
-      sudo docker run -d -P --volumes-from=git_repos -v=$CGIT_DATA_DIR:/data --name=cgit mdrohmann/cgit
+      sudo docker run -d -P --volumes-from=git_repos -v=${CGIT_DATA_DIR}:/data --name=cgit mdrohmann/cgit
 
 4. Get the port at which the cgit container started with
 
