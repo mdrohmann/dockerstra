@@ -17,7 +17,8 @@ They are built as follows:
 
    cd data/repositories
    sudo docker build --tag=data/repositories .
-   sudo docker build --tag=data/repositories:base -f gitolite_base_Dockerfile .
+   sudo docker build --tag=data/repositories:base \
+      -f gitolite_base_Dockerfile .
 
 and
 
@@ -27,7 +28,8 @@ and
    sudo docker build --tag mdrohmann/cgit .
 
 Furthermore, it is recommended to configure the cgitrc
-file in a host directory, that we want to call.  The default on my computer JUERGEN is
+file in a host directory, that we want to call.  The default on my computer
+`JUERGEN` is
 
 ::
 
@@ -48,14 +50,14 @@ Usage
 
    ::
 
-      sudo docker run -d -P --volumes-from=git_repos -v=${CGIT_DATA_DIR}:/data --name=cgit mdrohmann/cgit
+      sudo docker run -d -P --volumes-from=git_repos \
+          -v=${CGIT_DATA_DIR}:/data --name=cgit mdrohmann/cgit
 
 4. Get the port at which the cgit container started with
 
    ::
 
-      sd inspect \
-      --format='{{range $port, $conf := .NetworkSettings.Ports}}'\
+      sd inspect --format='{{range $port, $conf := .NetworkSettings.Ports}}'\
       '{{ (index $conf 0).HostPort }}'\
       '{{ end }}' cgit
 

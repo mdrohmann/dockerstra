@@ -78,9 +78,10 @@ Usage
 
       Afterwards, the certificate file needs to be installed on the system:
 
-      ::
+       ::
 
-         cp server.crt /usr/local/share/ca-certificates/pypi-internal.crt
+         cp server.crt \
+           /usr/local/share/ca-certificates/pypi-internal.crt
          update-ca-certificates
 
       See ``man update-ca-certificates`` for details.

@@ -24,13 +24,16 @@ Usage
 
    ::
 
-      sudo docker run --name=apt-cacher-ng -d -p 3142:3142 -v /tmp/cache/apt-cacher-ng:/var/cache/apt-cacher-ng mdrohmann/apt-cacher-ng
+      sudo docker run --name=apt-cacher-ng -d -p 3142:3142 \
+            -v /tmp/cache/apt-cacher-ng:/var/cache/apt-cacher-ng \
+            mdrohmann/apt-cacher-ng
 
 2. Add the proxy to the apt-get configuration
 
    ::
 
-      echo 'Acquire::http::Proxy "http://192.168.1.137:3142";' > /etc/apt/apt.conf.d/02proxy
+      echo 'Acquire::http::Proxy "http://192.168.1.137:3142";' \
+         > /etc/apt/apt.conf.d/02proxy
       echo 'Acquire::https::Proxy "false" >> /etc/apt/apt.conf.d/02proxy
 
    The second line disables the cacher for SSL connections.  As it would not

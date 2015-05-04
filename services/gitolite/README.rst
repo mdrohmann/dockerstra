@@ -41,7 +41,8 @@ Usage
 
    ::
 
-      sudo docker run -p 2022:22 --volumes-from=git_repos -v /home/git/.ssh --name=gitolite mdrohmann/gitolite
+      sudo docker run -p 2022:22 --volumes-from=git_repos -v /home/git/.ssh \
+         --name=gitolite mdrohmann/gitolite
 
 3. Create an entry in your .ssh/config files like this:
 
