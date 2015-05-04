@@ -14,4 +14,6 @@ EXPOSE 3142
 VOLUME ["/var/cache/apt-cacher-ng"]
 VOLUME ["/etc/apt-cacher-ng"]
 
+COPY acng.conf /etc/apt-cacher-ng/acng.conf
+
 CMD /usr/sbin/apt-cacher-ng ForeGround=1 CacheDir=/var/cache/apt-cacher-ng
