@@ -57,7 +57,6 @@ class TestWithDockerDaemon(object):
     def test_container_backup_restore(self, tmpdir):
         build_instructions = {
             'fileobj': BytesIO(test_dockerfile.encode('utf-8')),
-            'rm': True,
             'tag': self.testimage,
             }
         container = DockerContainer(
