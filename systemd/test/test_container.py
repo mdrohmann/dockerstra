@@ -6,7 +6,8 @@ import uuid
 import docker
 import pytest
 
-from docker_meta import (DockerContainer, run_configuration)
+from docker_meta import (
+    DockerContainer, run_configuration, read_configuration)
 
 test_dockerfile = '''
 FROM busybox:latest
@@ -194,5 +195,32 @@ def test_container_configuration(monkeypatch):
         ['x3', 'started'], 12, ['x2', 'created'], 0, ['x1', 'built'], 0,
         ['x1', '/volume', os.getcwd(), 'testbackup'], 0,
         ['x1', os.getcwd(), 'testbackup'], 0]
+
+
+def test_read_configuration(tmpdir):
+    testyaml = tmpdir.join('test.yaml')
+    testyaml.write("""
+x1: abc
+---
+-
+    x1:
+        command: start
+""")
+    configurations, order_list = read_configuration(str(testyaml))
+    expect = {'x1': 'abc'}
+    assert configurations == expect
+    assert order_list == [{'x1': {'command': 'start'}}]
+
+    testyaml2 = tmpdir.join('test2.yaml')
+    testyaml2.write("""
+import: test.yaml
+---
+-
+    x1:
+       command: backup
+""")
+    configurations, order_list = read_configuration(str(testyaml2))
+    assert configurations == expect
+    assert order_list == [{'x1': {'command': 'backup'}}]
 
 # vim:set ft=python sw=4 et spell spelllang=en:

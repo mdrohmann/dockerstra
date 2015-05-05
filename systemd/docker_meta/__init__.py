@@ -18,6 +18,11 @@ def read_configuration(configfile):
 
     order_list = configs[1]
     configurations = configs[0]
+    if len(configurations) == 1 and 'import' in configurations:
+        parent_file = os.path.abspath(
+            os.path.join(
+                os.path.dirname(configfile), configurations['import']))
+        configurations, _ = read_configuration(parent_file)
 
     return configurations, order_list
 
