@@ -6,7 +6,7 @@ import uuid
 import docker
 import pytest
 
-from containers import (DockerContainer, run_configuration)
+from docker_meta import (DockerContainer, run_configuration)
 
 test_dockerfile = '''
 FROM busybox:latest

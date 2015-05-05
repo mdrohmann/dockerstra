@@ -4,10 +4,10 @@ import os
 import docker
 import yaml
 
-from txtemplates.dist import Version
+from .dist import Version
 
 
-version = Version('docker_startup', 0, 1, 0)
+version = Version('docker_meta', 0, 1, 0)
 
 
 def read_configuration(configfile):

@@ -4,7 +4,7 @@ ez_setup.use_setuptools()
 import sys
 from setuptools import setup, find_packages
 from setuptools.command.test import test as TestCommand
-from containers import version
+from docker_meta import version
 
 
 class PyTest(TestCommand):
@@ -31,7 +31,7 @@ setup(
     author='Martin C Drohmann',
     author_email='mcd@askthevotegoat.com',
     version=version.long(),
-    install_requires=['docker-py'],
+    install_requires=['docker-py', 'pyyaml'],
     license='LICENSE',
     packages=find_packages(),
     cmdclass={'test': PyTest},
