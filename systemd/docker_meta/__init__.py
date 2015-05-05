@@ -7,7 +7,7 @@ import yaml
 from .dist import Version
 
 
-version = Version('docker_meta', 0, 1, 0)
+version = Version('docker_meta', 0, 2, 0, 'devel')
 
 
 def read_configuration(configfile):
