@@ -1,3 +1,4 @@
+import json
 import time
 import os
 
@@ -13,10 +14,15 @@ version = Version('docker_meta', 0, 2, 0, 'devel')
 def read_configuration(configfile):
     with open(configfile, 'r') as fh:
         configs = yaml.load_all(fh)
+        configs = list(configs)
 
-    configs = list(configs)
     order_list = configs[1]
     configurations = configs[0]
+    if len(configurations) == 1 and 'import' in configurations:
+        parent_file = os.path.abspath(
+            os.path.join(
+                os.path.dirname(configfile), configurations['import']))
+        configurations, _ = read_configuration(parent_file)
 
     return configurations, order_list
 
@@ -96,6 +102,7 @@ class DockerContainer(object):
 
     def build_image(self):
 
+        response = ''
         if self.build:
             # set the default to rm==True
             if 'rm' not in self.build:
@@ -103,9 +110,20 @@ class DockerContainer(object):
 
             response = [line for line in self.dc.build(**self.build)]
         else:
-            raise RuntimeError(
-                "No build instructions for image {} found."
-                .format(self.creation['image']))
+            image = self.creation.get('image')
+            tag = self.creation.get('tag', 'latest')
+            if image:
+                try:
+                    for line in self.dc.pull(
+                            repository=image, tag=tag, stream=True):
+                        response = json.loads(line)
+                        print(response.get('progressDetail'))
+                except Exception as e:
+                    raise RuntimeError(
+                        "No build instructions for image {}:\n{}\n{}"
+                        .format(image, e, repr(response)))
+            else:
+                raise RuntimeError("No image to pull or build given.")
 
         return '\n'.join(response)
 
@@ -120,6 +138,11 @@ class DockerContainer(object):
         except KeyError:
             raise RuntimeError(
                 "Creation requires a build tag or an image id.")
+        if self.get_container():
+            print(
+                "Warning: The image {} seems to exist already (skipped)."
+                .format(self.creation['image']))
+            return None
         try:
             info = self.dc.create_container(**self.creation)
             print "Created container: {}".format(repr(info))
@@ -164,14 +187,21 @@ class DockerContainer(object):
 
     def restore(self, restore_dir, restore_name):
 
-        gzipped_archive = '{}.tar.gz'.format(
+        archive = '{}.tar'.format(
             os.path.join(restore_dir, restore_name))
+        gzipped_archive = '{}.gz'.format(archive)
+        gzip = False
         if os.path.exists(gzipped_archive):
             os.system('gunzip {}'.format(gzipped_archive))
-        return self.manipulate_volumes(
+            gzip = True
+        res = self.manipulate_volumes(
             command=[
                 'tar', 'xf', '/backup/{}.tar'.format(restore_name)],
             binds={restore_dir: {'bind': '/backup', 'ro': True}})
+        if gzip:
+            os.system('gzip {}'.format(archive))
+
+        return res
 
     def stop(self, timeout=10):
         container = self.get_container()
