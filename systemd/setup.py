@@ -26,7 +26,7 @@ class PyTest(TestCommand):
         sys.exit(errno)
 
 setup(
-    name='docker_startup',
+    name='docker_meta',
     description='Automatically start docker containers',
     author='Martin C Drohmann',
     author_email='mcd@askthevotegoat.com',
