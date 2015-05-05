@@ -17,8 +17,6 @@ They are built as follows:
 
    cd data/repositories
    sudo docker build --tag=data/repositories .
-   sudo docker build --tag=data/repositories:base \
-      -f gitolite_base_Dockerfile .
 
 and
 
@@ -42,7 +40,7 @@ Usage
 
    ::
 
-      sudo docker create --name=git_repos data/repositories:base
+      sudo docker create --name=git_repos data/repositories
 
 2. Create cgitrc file in ``$CGIT_DATA_DIR``.
 
@@ -61,7 +59,7 @@ Usage
       '{{ (index $conf 0).HostPort }}'\
       '{{ end }}' cgit
 
-5. 
+5. Update the nginx configuration...
 
 .. _cgit: http://git.zx2c4.com/cgit/
 

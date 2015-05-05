@@ -18,7 +18,6 @@ They are built as follows:
 
    cd data/repositories
    sudo docker build --tag=data/repositories .
-   sudo docker build --tag=data/repositories:base -f gitolite_base_Dockerfile .
 
 and
 
@@ -35,7 +34,7 @@ Usage
 
    ::
 
-      sudo docker create --name=git_repos data/repositories:base
+      sudo docker create --name=git_repos data/repositories
 
 2. Run the gitolite container and bind it to the git_repos data container.
 
