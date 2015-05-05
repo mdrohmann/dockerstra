@@ -1,2 +1,9 @@
 *.sw[onp]
 *.bak
+.coverage
+coverage_html_report
+*.egg-info
+__pycache__
+*.pyc
+.build
+node_modules

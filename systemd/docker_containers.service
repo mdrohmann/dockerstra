@@ -1,0 +1,14 @@
+[Unit]
+Description=Main docker containers that should be started at every boot
+Documentation=gitolite_local:docker/
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash /usr/local/bin/docker_boot start
+ExecStop=/bin/bash /usr/local/bin/docker_boot stop
+
+[Install]
+WantedBy=mutli-user.target

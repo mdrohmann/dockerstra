@@ -1,0 +1,95 @@
+git_repos_base:
+    build:
+        path: data/repositories
+        tag: data/repositories
+git_repos:
+    build:
+        path: data/repositories
+        tag: data/repositories:base
+        dockerfile: gitolite_base_Dockerfile
+    creation:
+        name: git_repos
+data_pypi:
+    build:
+        path: data/pypicloud
+        tag: data/pypicloud
+    creation:
+        name: pypi_data
+
+gitolite:
+    build:
+        path: services/gitolite
+        tag: mdrohmann/gitolite
+    creation:
+        name: gitolite
+        volumes_from: git_repos
+        volumes: ["/home/git/.ssh"]
+    startup:
+        port_bindings: {2022: 22}
+
+cgit:
+    build:
+        path: services/cgit
+        tag: mdrohmann/cgit
+    creation:
+        name: cgit
+        volumes_from: git_repos
+    startup:
+        port_bindings: {12345: 80}
+        binds:
+            ${PWD}/etc:
+                bind: '/data'
+                ro: False
+
+pypicloud:
+    build:
+        path: services/pypicloud
+        tag: mdrohmann/pypicloud
+    creation:
+        name: pypicloud
+        volumes_from: data_pypi
+    startup:
+        binds:
+            ${PWD}/pypicloud:
+                bind: /etc/pypicloud
+                ro: False
+        port_bindings: {3031: 3031}
+
+apt-cacher-ng:
+    build:
+        path: services/apt-cacher-ng
+        tag: mdrohmann/apt-cacher-ng
+    creation:
+        name: apt-cacher-ng
+    startup:
+        binds:
+            /tmp/cache/apt-cacher-ng:
+                bind: /var/cache/apt-cacher-ng
+                ro: False
+        port_bindings:
+            3142: 3142
+
+---
+
+-
+  git_repos_base:
+      command: build
+-
+  git_repos:
+      command: create
+-
+  data_pypi:
+      command: build
+-
+  apt-cacher-ng:
+      command: start
+      wait: 1
+-
+  gitolite:
+      command: start
+-
+  cgit:
+      command: start
+-
+  pypicloud:
+      command: start
