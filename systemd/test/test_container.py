@@ -88,6 +88,8 @@ class TestWithDockerDaemon(object):
 
         container.restore(str(tmpdir), 'backup')
 
+        assert os.path.exists(str(tmpdir.join('backup.tar.gz')))
+
         res = container.manipulate_volumes(
             command=['ls', '/data/'])
 
