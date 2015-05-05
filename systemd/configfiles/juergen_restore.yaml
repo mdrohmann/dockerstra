@@ -1,3 +1,5 @@
+import: juergen_startup.yaml
+---
 -
   git_repos:
     command: restore
