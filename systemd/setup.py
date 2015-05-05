@@ -30,6 +30,7 @@ setup(
     description='Automatically start docker containers',
     author='Martin C Drohmann',
     author_email='mcd@askthevotegoat.com',
+    scripts=['scripts/docker_start.py'],
     version=version.long(),
     install_requires=['docker-py', 'pyyaml'],
     license='LICENSE',
