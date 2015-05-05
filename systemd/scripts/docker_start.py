@@ -10,7 +10,8 @@ from docker_meta import read_configuration, run_configuration
 def create_parser():
     parser = argparse.ArgumentParser("docker_start.py")
     parser.add_argument(
-        '-H', '--daemon', metavar="DAEMON", default='unix://var/run/docker.sock',
+        '-H', '--daemon', metavar="DAEMON",
+        default='unix://var/run/docker.sock',
         help='socket for daemon connection')
     parser.add_argument(
         'configfile', metavar="CONFIG",
@@ -24,6 +25,7 @@ if __name__ == "__main__":
 
     dc = docker.Client(args.daemon)
 
+    import pudb; pudb.set_trace()
     configurations, order_list = read_configuration(args.configfile)
     run_configuration(configurations, order_list, dc)
 
