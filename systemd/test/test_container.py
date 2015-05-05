@@ -75,7 +75,7 @@ class TestWithDockerDaemon(object):
 
         container.backup('/data', str(tmpdir), 'backup')
 
-        assert os.path.exists(str(tmpdir.join('backup.tar')))
+        assert os.path.exists(str(tmpdir.join('backup.tar.gz')))
 
         container.manipulate_volumes(
             command=['rm', '/data/empty_file']

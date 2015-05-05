@@ -72,9 +72,6 @@ apt-cacher-ng:
 ---
 
 -
-  git_repos_base:
-      command: build
--
   git_repos:
       command: create
 -

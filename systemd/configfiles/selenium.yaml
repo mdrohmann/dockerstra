@@ -1,0 +1,43 @@
+selenium_hub:
+    creation:
+        image: selenium/hub
+    startup:
+        port_bindings:
+            4444: 4444
+
+firefox_node:
+    creation:
+        image: selenium/node-firefox-debug
+    startup:
+        binds:
+            /tmp/e2e/uploads:
+                bind: /e2e/uploads
+                ro: False
+        publish_all_ports: True
+        links:
+            selenium_hub: hub
+
+
+chrome_node:
+    creation:
+        image: selenium/node-chrome-debug
+    startup:
+        binds:
+            /tmp/e2e/uploads:
+                bind: /e2e/uploads
+                ro: False
+        publish_all_ports: True
+        links:
+            selenium_hub: hub
+
+---
+
+-
+    selenium_hub:
+        command: create
+-
+    firefox_node:
+        command: create
+-
+    chrome_node:
+        command: create

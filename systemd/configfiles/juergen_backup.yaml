@@ -1,0 +1,12 @@
+-
+  git_repos:
+    command: backup
+    source: /repositories
+    backup_dir: /backup
+    backup_name: git_repos
+-
+  data_pypi:
+    command: backup
+    source: /data
+    backup_dir: /backup
+    backup_name: pypicloud

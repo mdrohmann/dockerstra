@@ -155,12 +155,19 @@ class DockerContainer(object):
         return stdout
 
     def backup(self, source, target_dir, target_name):
-        return self.manipulate_volumes(
+        res = self.manipulate_volumes(
             command=[
                 'tar', 'cvf', '/backup/{}.tar'.format(target_name), source],
             binds={target_dir: {'bind': '/backup', 'ro': False}})
+        os.system('gzip {}.tar'.format(os.path.join(target_dir, target_name)))
+        return res
 
     def restore(self, restore_dir, restore_name):
+
+        gzipped_archive = '{}.tar.gz'.format(
+            os.path.join(restore_dir, restore_name))
+        if os.path.exists(gzipped_archive):
+            os.system('gunzip {}'.format(gzipped_archive))
         return self.manipulate_volumes(
             command=[
                 'tar', 'xf', '/backup/{}.tar'.format(restore_name)],
