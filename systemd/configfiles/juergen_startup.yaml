@@ -1,14 +1,10 @@
-git_repos_base:
-    build:
-        path: data/repositories
-        tag: data/repositories
 git_repos:
     build:
         path: data/repositories
-        tag: data/repositories:base
-        dockerfile: gitolite_base_Dockerfile
+        tag: data/repositories
     creation:
         name: git_repos
+
 data_pypi:
     build:
         path: data/pypicloud
