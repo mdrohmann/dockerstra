@@ -27,7 +27,7 @@ def read_configuration(configfile):
     return configurations, order_list
 
 
-def run_configuration(configurations, order_list, dc):
+def run_configuration(configurations, order_list, dc, stop_all=False):
 
     for item in order_list:
 
@@ -36,6 +36,10 @@ def run_configuration(configurations, order_list, dc):
         cmd = orders['command']
 
         container = DockerContainer(dc, name, **c)
+
+        if stop_all:
+            cmd = 'stop'
+            orders['timeout'] = 0
 
         if cmd == 'build':
             container.build_image()
@@ -50,6 +54,10 @@ def run_configuration(configurations, order_list, dc):
             backup_dir = os.path.abspath(orders.get('backup_dir', ','))
             container.backup(
                 orders['source'], backup_dir, orders['backup_name'])
+        elif cmd == 'stop':
+            container.stop(orders.get('timeout', 10))
+        elif cmd == 'remove':
+            container.remove(orders.get('v', True))
         else:
             raise ValueError(
                 "Invalid command {} for container {}".format(cmd, name))
@@ -205,6 +213,12 @@ class DockerContainer(object):
 
     def stop(self, timeout=10):
         container = self.get_container()
-        self.dc.stop(container, timeout)
+        if self.is_started():
+            self.dc.stop(container, timeout)
+
+    def remove(self, v=True, timeout=10):
+        container = self.get_container()
+        self.stop(timeout)
+        self.dc.remove_container(container, v)
 
 # vim:set ft=python sw=4 et spell spelllang=en:

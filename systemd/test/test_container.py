@@ -122,7 +122,7 @@ class TestWithDockerDaemon(object):
         # delete container and it should work again afterwards...
 
         container.stop(timeout=0)
-        self.cli.remove_container(self.testcontainer, force=True)
+        container.remove(v=True)
 
         assert not container.get_container()
         container.start()
@@ -146,6 +146,12 @@ def test_container_configuration(monkeypatch):
     monkeypatch.setattr(
         DockerContainer, 'start',
         lambda self, *args, **kwargs: events.append([self.name, self.startup]))
+    monkeypatch.setattr(
+        DockerContainer, 'stop',
+        lambda self, *args, **kwargs: events.append([self.name, args[0]]))
+    monkeypatch.setattr(
+        DockerContainer, 'remove',
+        lambda self, *args, **kwargs: events.append([self.name, args[0]]))
     monkeypatch.setattr(
         DockerContainer, 'build_image',
         lambda self, *args, **kwargs: events.append([self.name, self.build]))
@@ -190,13 +196,24 @@ def test_container_configuration(monkeypatch):
                 'restore_dir': '.',
                 'restore_name': 'testbackup',
             }},
+            {'x1': {
+                'command': 'stop',
+                'timeout': 3,
+            }},
+            {'x1': {
+                'command': 'remove',
+                'v': False,
+            }},
         ],
         None)
 
     assert events == [
         ['x3', 'started'], 12, ['x2', 'created'], 0, ['x1', 'built'], 0,
         ['x1', '/volume', os.getcwd(), 'testbackup'], 0,
-        ['x1', os.getcwd(), 'testbackup'], 0]
+        ['x1', os.getcwd(), 'testbackup'], 0,
+        ['x1', 3], 0,
+        ['x1', False], 0,
+        ]
 
 
 def test_read_configuration(tmpdir):
