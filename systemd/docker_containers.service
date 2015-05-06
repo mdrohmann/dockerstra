@@ -1,14 +1,15 @@
 [Unit]
 Description=Main docker containers that should be started at every boot
 Documentation=gitolite_local:docker/
-After=network.target docker.service
+After=network.target docker.service home-martin.mount
 Wants=docker.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/bash /usr/local/bin/docker_boot start
-ExecStop=/bin/bash /usr/local/bin/docker_boot stop
+WorkingDirectory=/home/martin/gistin/docker/
+ExecStart=/usr/bin/python /usr/local/bin/docker_start.py systemd/configfiles/juergen_startup.yaml
+ExecStop=/usr/bin/python /usr/local/bin/docker_start.py --stop-all systemd/configfiles/juergen_startup.yaml
 
 [Install]
 WantedBy=mutli-user.target
