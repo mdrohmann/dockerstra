@@ -5,10 +5,9 @@ import os
 import docker
 import yaml
 
-from .dist import Version
+from pkg_resources import get_distribution
 
-
-version = Version('docker_meta', 0, 2, 0, 'devel')
+__version__ = get_distribution('docker_meta').version
 
 
 def read_configuration(configfile):
