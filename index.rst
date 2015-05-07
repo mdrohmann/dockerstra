@@ -14,6 +14,8 @@ Contents:
    data/README
    services/README
 
+   systemd/docs/index
+
 
 Indices and tables
 ==================

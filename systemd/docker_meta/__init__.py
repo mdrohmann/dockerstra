@@ -36,16 +36,19 @@ def run_configuration(configurations, order_list, dc, stop_all=False):
 
         container = DockerContainer(dc, name, **c)
 
+        timeout = orders.pop('timeout', 10)
+
         if stop_all:
             cmd = 'stop'
-            orders['timeout'] = 0
+            timeout = 0
 
         if cmd == 'build':
             container.build_image()
         elif cmd == 'create':
             container.create()
         elif cmd == 'start':
-            container.start()
+            restart = orders.pop('restart', False)
+            container.start(restart, timeout)
         elif cmd == 'restore':
             restore_dir = os.path.abspath(orders.get('restore_dir', '.'))
             container.restore(restore_dir, orders['restore_name'])
@@ -54,9 +57,10 @@ def run_configuration(configurations, order_list, dc, stop_all=False):
             container.backup(
                 orders['source'], backup_dir, orders['backup_name'])
         elif cmd == 'stop':
-            container.stop(orders.get('timeout', 10))
+            container.stop(timeout)
         elif cmd == 'remove':
-            container.remove(orders.get('v', True))
+            v = orders.pop('v', True)
+            container.remove(v, timeout)
         else:
             raise ValueError(
                 "Invalid command {} for container {}".format(cmd, name))
@@ -136,7 +140,8 @@ class DockerContainer(object):
 
     def create(self):
         if (not self.creation) and (not self.build):
-            raise RuntimeError("No configuration given")
+            raise RuntimeError(
+                "No configuration to create the container given.")
 
         self.creation['name'] = self.name
         try:
