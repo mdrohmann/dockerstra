@@ -32,7 +32,6 @@ COPY cgitrc /etc/cgitrc.default
 COPY start.sh /start.sh
 
 VOLUME ["/data"]
-VOLUME ["/repositories"]
 
 EXPOSE 80
 
