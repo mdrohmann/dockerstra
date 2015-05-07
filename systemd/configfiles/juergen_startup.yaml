@@ -72,7 +72,7 @@ apt-cacher-ng:
       command: create
 -
   data_pypi:
-      command: build
+      command: create
 -
   apt-cacher-ng:
       command: start

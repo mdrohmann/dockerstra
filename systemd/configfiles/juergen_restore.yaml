@@ -3,10 +3,10 @@ import: juergen_startup.yaml
 -
   git_repos:
     command: restore
-    restore_dir: /backup
+    restore_dir: /home/martin/docker_backup
     restore_name: git_repos
 -
   data_pypi:
     command: restore
-    restore_dir: /backup
+    restore_dir: /home/martin/docker_backup
     restore_name: pypicloud
