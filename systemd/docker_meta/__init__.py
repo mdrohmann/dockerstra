@@ -77,6 +77,24 @@ class DockerContainer(object):
         self.creation = creation
         self.startup = startup
         self.build = build
+        self._update_start_config()
+        self._update_creation_config()
+
+    def _update_start_config(self):
+        if 'binds' in self.startup:
+            binds = self.startup['binds']
+            nbinds = {}
+            for fro, to in binds.iteritems():
+                nfro = fro.replace(
+                    '${PWD}', os.path.abspath(self.build['path']))
+                nbinds[nfro] = to
+            self.startup['binds'] = nbinds
+
+    def _update_creation_config(self):
+        if 'port_bindings' in self.startup:
+            ports = self.startup['port_bindings'].keys()
+            cports = set(self.creation.pop('ports', []) + ports)
+            self.creation['ports'] = list(cports)
 
     def is_started(self):
         res = self.dc.inspect_container(self.get_container())
