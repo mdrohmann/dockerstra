@@ -60,13 +60,13 @@ Alternatively, the first document can simply be of the form:
 in which case the container descriptions are read from the file
 ``other_file.yaml``.
 
-List of orders
-**************
+List of commands
+****************
 
-The second document describes a list of orders to execute on the previously
+The second document describes a list of commands to execute on the previously
 defined containers.  The document is a list of dictionaries with only one key
 (the container name to execute a command on).  The value of this dictionary is
-another dictionary specifying a `command <commands>`_ and its arguments.
+another dictionary specifying a :ref:`command <commands>` and its arguments.
 
 Example
 ```````
@@ -104,9 +104,12 @@ An example configuration file looks like this:
 Commands
 ````````
 
+The following commands can be specified in the list of commands:
+
 build
   builds a new image. This calls `build()` from docker-py_ with the options
-  defined in the ``build`` part of the `composition document <composition>`_.
+  defined in the ``build`` part of the :ref:`composition document
+  <composition>`.
 create
   creates a new container. This calls `create_container()` from docker-py_ with
   the options defined in the ``creation`` part of the `composition document
