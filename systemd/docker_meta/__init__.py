@@ -85,6 +85,11 @@ class DockerContainer(object):
             binds = self.startup['binds']
             nbinds = {}
             for fro, to in binds.iteritems():
+                if 'path' not in self.build:
+                    raise ValueError(
+                        "The path key needs to be specified for ${{PWD}} "
+                        "replacement in startup configuration of {name}"
+                        .format(name=self.name))
                 nfro = fro.replace(
                     '${PWD}', os.path.abspath(self.build['path']))
                 nbinds[nfro] = to

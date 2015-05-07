@@ -242,4 +242,39 @@ import: test.yaml
     assert configurations == expect
     assert order_list == [{'x1': {'command': 'backup'}}]
 
+
+def test_startup_manipulation():
+    bind_path_host = '${PWD}/path'
+    bind_container = {'binds': 'path', 'ro': True}
+    startup = {
+        'other_key': 'other_value',
+        'binds': {bind_path_host: bind_container},
+    }
+    build = {'path': '/other_path'}
+    dc = DockerContainer(None, 'test', startup=startup, build=build)
+    new_key_expected = os.path.abspath('/other_path/path')
+    assert dc.startup['binds'].keys() == [new_key_expected]
+    assert dc.startup['binds'][new_key_expected] == bind_container
+    assert 'other_key' in dc.startup
+
+
+def test_startup_manipulation_error():
+    bind_path_host = '${PWD}/path'
+    bind_container = {'binds': 'path', 'ro': True}
+    startup = {
+        'other_key': 'other_value',
+        'binds': {bind_path_host: bind_container},
+    }
+    with pytest.raises(ValueError):
+        DockerContainer(None, 'test', startup=startup)
+
+
+def test_creation_manipulation():
+    port_bindings = {22: 2222, 44: 4444}
+    startup = {'port_bindings': port_bindings}
+    ports = [22, 44]
+
+    dc = DockerContainer(None, 'test', startup=startup)
+    assert set(dc.creation['ports']) == set(ports)
+
 # vim:set ft=python sw=4 et spell spelllang=en:
