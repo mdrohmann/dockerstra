@@ -111,6 +111,17 @@ class DockerContainer(object):
         res = self.dc.inspect_container(self.get_container())
         return res['State']['Running']
 
+    def get_image(self, name=None):
+        if name is None:
+            name = self.creation.get('image', self.build.get('tag', None))
+        images = self.dc.images(name)
+        if len(images) == 1:
+            return images[0]
+        elif len(images) == 0:
+            return {}
+        else:
+            raise RuntimeError("This should not happen!")
+
     def get_container(self):
         containers = self.dc.containers(filters={'name': self.name}, all=True)
         if len(containers) == 1:
@@ -129,6 +140,11 @@ class DockerContainer(object):
             if restart or not self.is_started():
                 self.dc.restart(container, timeout)
                 log.info("Started container {}".format(self.name))
+            else:
+                log.debug(
+                    "Container {} is already started. (skipped)  "
+                    "Add 'restart=True' to arguments to restart container."
+                    .format(self.name))
         else:
             try:
                 log.debug(
@@ -146,6 +162,12 @@ class DockerContainer(object):
                     .format(self.name, e))
 
     def build_image(self):
+        imjson = self.get_image()
+        if imjson:
+            log.debug(
+                "Image {} already exists. (skipped)"
+                .format(imjson['RepoTags'][0]))
+            return None
         if self.build:
             # set the default to rm==True
             if 'rm' not in self.build:
@@ -197,9 +219,9 @@ class DockerContainer(object):
             raise RuntimeError(
                 "Creation requires a build tag or an image id.")
         if self.get_container():
-            log.warn(
-                "Warning: The image {} seems to exist already (skipped)."
-                .format(self.creation['image']))
+            log.debug(
+                "The container {} seems to exist already (skipped)."
+                .format(self.name))
             return None
         try:
             self._log_output(
@@ -214,7 +236,7 @@ class DockerContainer(object):
                 self.build_image()
                 self.dc.create_container(**self.creation)
                 log.info(
-                    "Successfully created the container {}"
+                    "Successfully created the container {}."
                     .format(self.name))
             else:
                 raise e

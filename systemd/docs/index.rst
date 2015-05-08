@@ -23,6 +23,11 @@ The main script is called ``docker_start`` and takes one configuration file
 as an argument.  It is based on the docker-py_ package to communicate with
 the docker daemon.
 
+The verbosity of the output can be controlled with the flags ``verbose`` and
+``debug``.  Set ``debug=True`` in order to get notified about skipped steps and
+automatic changes of the configuration.  Increasing the verbosity, creates more
+information about the output of the docker-py_ commands.
+
 YAML configuration files
 ````````````````````````
 
@@ -119,7 +124,8 @@ start
   runs a container. This calls `start()` from docker-py_ with the options
   defined the ``startup`` part of the `composition document <composition>`_.
   If the container has not been created yet, the `create` step is executed too.
-  If the container is already running, nothing is done (silently!).
+  If the container is already running, nothing is done.  Enable the debug mode
+  if you want to be notified about skipped steps.
 
   **Arguments**:
     restart
