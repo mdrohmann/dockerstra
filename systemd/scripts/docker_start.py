@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
-import sys
+import logging
 
 import docker
 
@@ -11,7 +11,20 @@ import docker_meta
 
 def create_parser():
     parser = argparse.ArgumentParser(
-        "docker_start.py", version=docker_meta.__version__)
+        "docker_start.py")
+    parser.add_argument(
+        '-V', '--version', action='version',
+        version='%(prog)s {}'.format(docker_meta.__version__),
+        help='prints the version of the script')
+    parser.add_argument(
+        '-v', '--verbose', action='count',
+        help='verbosity level')
+    parser.add_argument(
+        '-d', '--debug', action='store_true',
+        help='Output debug information')
+    parser.add_argument(
+        '-l', '--errfile', default=None,
+        help='filename where to log errors')
     parser.add_argument(
         '-s', '--stop-all', action='store_true',
         help='Stop all the processes that are touched by the configuration')
@@ -29,9 +42,18 @@ if __name__ == "__main__":
     parser = create_parser()
     args = parser.parse_args()
 
+    docker_meta.logger.configure_logger(
+        debug=args.debug, errfile=args.errfile, verbosity=args.verbose)
+
+    # we prefer the following syntax for refactoring purposes.
+    log = logging.getLogger(docker_meta.__name__)
+
     dc = docker.Client(args.daemon)
 
-    configurations, order_list = read_configuration(args.configfile)
-    run_configuration(configurations, order_list, dc, args.stop_all)
+    try:
+        configurations, order_list = read_configuration(args.configfile)
+        run_configuration(configurations, order_list, dc, args.stop_all)
+    except:
+        log.error("Failed to execute the recipe")
 
 # vim:set ft=python sw=4 et spell spelllang=en:

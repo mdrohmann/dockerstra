@@ -1,13 +1,17 @@
-import json
-import time
+import logging
 import os
+import time
 
 import docker
 import yaml
-
 from pkg_resources import get_distribution
 
-__version__ = get_distribution('docker_meta').version
+
+__version__ = get_distribution(__name__).version
+
+
+# logging.getLogger(__name__).addHandler(logging.NullHandler)
+log = logging.getLogger(__name__)
 
 
 def read_configuration(configfile):
@@ -42,6 +46,7 @@ def run_configuration(configurations, order_list, dc, stop_all=False):
             cmd = 'stop'
             timeout = 0
 
+        log.info('Executing step {} on {}'.format(cmd, name))
         if cmd == 'build':
             container.build_image()
         elif cmd == 'create':
@@ -79,6 +84,7 @@ class DockerContainer(object):
         self.build = build
         self._update_start_config()
         self._update_creation_config()
+        log.debug("Initialized docker container {}".format(name))
 
     def _update_start_config(self):
         if 'binds' in self.startup:
@@ -122,12 +128,17 @@ class DockerContainer(object):
         if container:
             if restart or not self.is_started():
                 self.dc.restart(container, timeout)
+                log.info("Started container {}".format(self.name))
         else:
             try:
+                log.debug(
+                    "Cannot start the container {}.  Trying to create it."
+                    .format(self.name))
                 # Create the container ...
                 self.create()
                 # ... and then start it.
                 self.dc.start(container=self.name, **self.startup)
+                log.info("Started container {}".format(self.name))
             except Exception as e:
                 raise RuntimeError(
                     "Container {} does not exist, and I do not know how to "
@@ -135,14 +146,20 @@ class DockerContainer(object):
                     .format(self.name, e))
 
     def build_image(self):
-
-        response = ''
         if self.build:
             # set the default to rm==True
             if 'rm' not in self.build:
+                log.debug(
+                    "Setting build flag 'rm' to True in container {}"
+                    .format(self.name))
                 self.build['rm'] = True
 
-            response = [line for line in self.dc.build(**self.build)]
+            for line in self.dc.build(**self.build):
+                log.info(line, extra={'type': 'output', 'cmd': 'build'})
+            log.info(
+                "Successfully built the image {}"
+                .format(self.build.get(
+                    'tag', 'for container {}'.format(self.name))))
         else:
             image = self.creation.get('image')
             tag = self.creation.get('tag', 'latest')
@@ -150,16 +167,19 @@ class DockerContainer(object):
                 try:
                     for line in self.dc.pull(
                             repository=image, tag=tag, stream=True):
-                        response = json.loads(line)
-                        print(response.get('progressDetail'))
+                        log.info(line, extra={'type': 'output', 'cmd': 'pull'})
+                        # print(response.get('progressDetail'))
+                    log.info(
+                        "Successfully pulled the image {}".format(image))
                 except Exception as e:
                     raise RuntimeError(
-                        "No build instructions for image {}:\n{}\n{}"
-                        .format(image, e, repr(response)))
+                        "No build instructions for image {}:\n{}"
+                        .format(image, e))
             else:
                 raise RuntimeError("No image to pull or build given.")
 
-        return '\n'.join(response)
+    def _log_output(self, line, command):
+        log.info(line, extra={'type': 'output', 'cmd': command, 'dc': self})
 
     def create(self):
         if (not self.creation) and (not self.build):
@@ -170,21 +190,32 @@ class DockerContainer(object):
         try:
             self.creation['image'] = self.build.get(
                 'tag', self.creation.get('image'))
+            log.debug(
+                "set creation fields for 'name' and 'image' to {name} and "
+                "{image}".format(**(self.creation)))
         except KeyError:
             raise RuntimeError(
                 "Creation requires a build tag or an image id.")
         if self.get_container():
-            print(
+            log.warn(
                 "Warning: The image {} seems to exist already (skipped)."
                 .format(self.creation['image']))
             return None
         try:
-            info = self.dc.create_container(**self.creation)
-            print "Created container: {}".format(repr(info))
+            self._log_output(
+                self.dc.create_container(**self.creation), 'create_container')
+            log.info("Successfully created the container {}".format(self.name))
         except docker.errors.APIError as e:
             if 'No such image' in str(e):
+                log.debug(
+                    "The image {} to create the container {} did not exist.  "
+                    "Trying to build it..."
+                    .format(self.creation["image"], self.name))
                 self.build_image()
                 self.dc.create_container(**self.creation)
+                log.info(
+                    "Successfully created the container {}"
+                    .format(self.name))
             else:
                 raise e
 
@@ -205,14 +236,25 @@ class DockerContainer(object):
 
         self.dc.remove_container(info)
 
+        info = (
+            'Executing command {} on container {}.  Output follows\n{}'
+            .format(command, self.name, stdout))
+        self._log_output(info, 'manipulate_volumes')
+
         if exit_code != 0:
             stderr = self.dc.logs(info, stdout=False, stderr=True, tail=3)
             raise RuntimeError(
                 "Manipulation of volume {} failed with exit code {}:\n{}"
                 .format(command, exit_code, stderr))
-        return stdout
+
+        log.info(
+            "Successfully executed command {} in container {}."
+            .format(command, self.name))
 
     def backup(self, source, target_dir, target_name):
+        log.info(
+            "Backup of container {}: {} -> {}/{}"
+            .format(self.name, source, target_dir, target_name))
         res = self.manipulate_volumes(
             command=[
                 'tar', 'cvf', '/backup/{}.tar'.format(target_name), source],
@@ -221,12 +263,17 @@ class DockerContainer(object):
         return res
 
     def restore(self, restore_dir, restore_name):
+        log.info(
+            "Restoring container {} from {}/{}"
+            .format(self.name, restore_dir, restore_name))
 
         archive = '{}.tar'.format(
             os.path.join(restore_dir, restore_name))
         gzipped_archive = '{}.gz'.format(archive)
         gzip = False
         if os.path.exists(gzipped_archive):
+            log.debug(
+                'unzipping the tar archive {} first'.format(gzipped_archive))
             os.system('gunzip {}'.format(gzipped_archive))
             gzip = True
         res = self.manipulate_volumes(
@@ -242,10 +289,19 @@ class DockerContainer(object):
         container = self.get_container()
         if self.is_started():
             self.dc.stop(container, timeout)
+            log.info("Successfully stopped container {}".format(self.name))
+        else:
+            log.debug(
+                "Not stopping container {} as it was not running".format(self.name))
 
     def remove(self, v=True, timeout=10):
-        container = self.get_container()
         self.stop(timeout)
-        self.dc.remove_container(container, v)
+        container = self.get_container()
+        if container:
+            self.dc.remove_container(container, v)
+            log.info("Successfully removed container {}".format(self.name))
+        else:
+            log.debug(
+                "Not removing container {} as it did not exist.".format(self.name))
 
 # vim:set ft=python sw=4 et spell spelllang=en:

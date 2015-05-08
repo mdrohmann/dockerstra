@@ -1,13 +1,17 @@
-from io import BytesIO
+import logging
 import os
 import time
 import uuid
+from io import BytesIO
 
 import docker
 import pytest
 
+import docker_meta
 from docker_meta import (
     DockerContainer, run_configuration, read_configuration)
+from docker_meta.logger import configure_logger
+
 
 test_dockerfile = '''
 FROM busybox:latest
@@ -16,6 +20,9 @@ VOLUME ["/data"]
 
 CMD /bin/sh -c 'echo hello world; sleep 10'
     '''
+
+configure_logger(test=True)
+log = logging.getLogger(docker_meta.__name__)
 
 
 class TestWithDockerDaemon(object):
