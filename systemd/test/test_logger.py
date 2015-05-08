@@ -3,25 +3,53 @@ import sys
 
 import pytest
 
+import docker_meta
 from docker_meta import DockerContainer
 from docker_meta.logger import (
-    _get_logger_configuration, configure_logger, test_streams)
+    _get_logger_configuration, configure_logger,
+    last_info_line, last_error_line, info_lines, error_lines)
 
 
-def test_log_split():
+@pytest.fixture
+def logger():
     configure_logger(test=True)
-    log = logging.getLogger('docker_meta')
+    return logging.getLogger(docker_meta.__name__)
+
+
+def test_configure_logger_global(logger):
+    # reconfiguring with other options...
+    configure_logger(test=True, verbosity=2)
+    log2 = logging.getLogger(docker_meta.__name__)
+    # ... changes all logging instances, because they are global
+    assert log2 == logger
+
+
+def test_configure_logger_debug():
+    configure_logger(test=True, debug=True)
+    log = logging.getLogger(docker_meta.__name__)
+    assert log.level == logging.DEBUG
+
+
+def test_logger_test_streams(logger):
+    logger.info('test')
+    assert len(info_lines()) > 0
+    logger.error('test')
+    assert len(error_lines()) > 0
+
+
+def test_log_split(logger):
+    log = logger
     log.warn('test')
     log.info('test_info')
 
     # log debug should be ignored
     log.debug('ignored')
 
-    infos = test_streams['info'].getvalue().split('\n')
-    errors = test_streams['errors'].getvalue().split('\n')
+    infos = last_info_line(None)
+    errors = last_error_line(None)
 
-    assert len(infos) == 2
-    assert len(errors) == 2
+    assert len(infos) == 1
+    assert len(errors) == 1
     assert infos[0].endswith('INFO: test_info')
     assert errors[0].endswith('WARNING: test_logger.py: test')
 
@@ -40,9 +68,9 @@ def test_log_configuration():
 
 @pytest.mark.parametrize('v,expected', [
     (0, 1),
-    (1, 4),
-    (2, 6),
-    (3, 44),
+    (1, 3),
+    (2, 5),
+    (3, 43),
     ], ids=['verbose={}'.format(i) for i in range(4)])
 def test_output_filter_pull(v, expected):
     configure_logger(test=True, verbosity=v)
@@ -60,7 +88,7 @@ def test_output_filter_pull(v, expected):
     # invalid pull commands go through without an error
     dc._log_output({"Id": "cd", "Warnings": 1}, 'pull')
     dc._log_output('{"Id": "cd", "status": "invalid"}', 'pull')
-    infos = test_streams['info'].getvalue().split('\n')
+    infos = last_info_line(None)
     assert len(infos) == expected
     if len(infos) > 1:
         assert infos[0].endswith('(bc) a: {}'.format(repr({u"0": 40})))
@@ -68,9 +96,9 @@ def test_output_filter_pull(v, expected):
 
 @pytest.mark.parametrize('v,expected', [
     (0, 1),
-    (1, 3),
-    (2, 3),
-    (3, 3),
+    (1, 2),
+    (2, 2),
+    (3, 2),
     ], ids=['verbose={}'.format(i) for i in range(4)])
 def test_output_filter_build_image(v, expected):
     configure_logger(test=True, verbosity=v)
@@ -80,7 +108,7 @@ def test_output_filter_build_image(v, expected):
     dc._log_output('{"stream": "world"}', 'build')
     dc._log_output({"stream": "world"}, 'build')
 
-    infos = test_streams['info'].getvalue().split('\n')
+    infos = last_info_line(None)
     assert len(infos) == expected
     if len(infos) > 1:
         assert infos[0].endswith('hello')
@@ -89,9 +117,9 @@ def test_output_filter_build_image(v, expected):
 
 @pytest.mark.parametrize('v,expected', [
     (0, 1),
-    (1, 4),
-    (2, 4),
-    (3, 4),
+    (1, 3),
+    (2, 3),
+    (3, 3),
     ], ids=['verbose={}'.format(i) for i in range(4)])
 def test_output_filter_create_container(v, expected):
     configure_logger(test=True, verbosity=v)
@@ -102,7 +130,7 @@ def test_output_filter_create_container(v, expected):
     dc._log_output(
         {'Id': 'def', 'Warnings': 'ohoh'}, 'create_container')
 
-    infos = test_streams['info'].getvalue().split('\n')
+    infos = last_info_line(None)
     assert len(infos) == expected
     if len(infos) > 1:
         assert infos[0].endswith('Created image with Id abc')

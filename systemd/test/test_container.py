@@ -10,7 +10,7 @@ import pytest
 import docker_meta
 from docker_meta import (
     DockerContainer, run_configuration, read_configuration)
-from docker_meta.logger import configure_logger
+from docker_meta.logger import configure_logger, last_info_line
 
 
 test_dockerfile = '''
@@ -21,7 +21,7 @@ VOLUME ["/data"]
 CMD /bin/sh -c 'echo hello world; sleep 10'
     '''
 
-configure_logger(test=True)
+configure_logger(test=True, verbosity=1)
 log = logging.getLogger(docker_meta.__name__)
 
 
@@ -63,6 +63,7 @@ class TestWithDockerDaemon(object):
             container.start()
 
     def test_container_backup_restore(self, tmpdir):
+        configure_logger(test=True, verbosity=1)
         build_instructions = {
             'fileobj': BytesIO(test_dockerfile.encode('utf-8')),
             'tag': self.testimage,
@@ -75,10 +76,10 @@ class TestWithDockerDaemon(object):
             command=['touch', '/data/empty_file']
         )
 
-        res = container.manipulate_volumes(
+        container.manipulate_volumes(
             command=['ls', '/data/'])
 
-        assert res == "empty_file\n"
+        assert last_info_line(3)[0] == "empty_file"
 
         container.backup('/data', str(tmpdir), 'backup')
 
@@ -88,19 +89,19 @@ class TestWithDockerDaemon(object):
             command=['rm', '/data/empty_file']
         )
 
-        res = container.manipulate_volumes(
+        container.manipulate_volumes(
             command=['ls', '/data/'])
 
-        assert res == ''
+        assert last_info_line(3)[0].endswith("Output follows")
 
         container.restore(str(tmpdir), 'backup')
 
         assert os.path.exists(str(tmpdir.join('backup.tar.gz')))
 
-        res = container.manipulate_volumes(
+        container.manipulate_volumes(
             command=['ls', '/data/'])
 
-        assert res == "empty_file\n"
+        assert last_info_line(3)[0] == "empty_file"
 
     def test_container_creation(self):
         creation = {'image': self.testimage}

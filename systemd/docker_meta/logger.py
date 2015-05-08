@@ -3,7 +3,6 @@ import logging.config
 import sys
 from StringIO import StringIO
 
-
 test_streams = {}
 
 
@@ -59,7 +58,8 @@ class OutputFilter(logging.Filter):
                 out = {'id': '', 'status': '', 'progressDetail': ''}
                 out.update(md)
                 record.msg = '({id}) {status}: {progressDetail}'.format(**out)
-            return True
+
+        return True
 
 
 class MaxFilter(logging.Filter):
@@ -172,3 +172,35 @@ def _get_logger_configuration(
 def configure_logger(*args, **kwargs):
     config = _get_logger_configuration(*args, **kwargs)
     logging.config.dictConfig(config)
+
+
+def _test_stream_lines(stream):
+    return test_streams.get(stream, StringIO()).getvalue().rstrip()
+
+
+def info_lines():
+    return _test_stream_lines('info')
+
+
+def error_lines():
+    return _test_stream_lines('errors')
+
+
+def last_info_line(n=1):
+    return _last_stream_line('info', n)
+
+
+def last_error_line(n=1):
+    return _last_stream_line('errors', n)
+
+
+def _last_stream_line(stream, n=1):
+    rsargs = [x for x in ['\n', n] if x is not None]
+    infos = _test_stream_lines(stream).rsplit(*rsargs)
+    if n is not None and len(infos) > 1:
+        res = infos[1:]
+    else:
+        res = infos
+    return res
+
+# vim:set ft=python sw=4 et spell spelllang=en:
