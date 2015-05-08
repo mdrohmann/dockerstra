@@ -6,6 +6,7 @@ import logging
 import docker
 
 from docker_meta import read_configuration, run_configuration
+from docker_meta.logger import configure_logger
 import docker_meta
 
 
@@ -24,7 +25,10 @@ def create_parser():
         help='Output debug information')
     parser.add_argument(
         '-l', '--errfile', default=None,
-        help='filename where to log errors')
+        help='logfile for errors (deactivates stderr)')
+    parser.add_argument(
+        '-i', '--infofile', default=None,
+        help='logfile for infos (deactivates stdout)')
     parser.add_argument(
         '-s', '--stop-all', action='store_true',
         help='Stop all the processes that are touched by the configuration')
@@ -42,8 +46,9 @@ if __name__ == "__main__":
     parser = create_parser()
     args = parser.parse_args()
 
-    docker_meta.logger.configure_logger(
-        debug=args.debug, errfile=args.errfile, verbosity=args.verbose)
+    configure_logger(
+        debug=args.debug, verbosity=args.verbose,
+        errorfile=args.errfile, infofile=args.infofile)
 
     # we prefer the following syntax for refactoring purposes.
     log = logging.getLogger(docker_meta.__name__)
