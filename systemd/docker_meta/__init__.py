@@ -114,16 +114,21 @@ class DockerContainer(object):
     def get_image(self, name=None):
         if name is None:
             name = self.creation.get('image', self.build.get('tag', None))
-        images = self.dc.images(name)
+        name_split = name.rsplit(':', 1)
+        images = self.dc.images(name_split[0])
         if len(images) == 1:
-            return images[0]
+            if len(name_split) == 2 and name not in images[0]['RepoTags']:
+                return {}
+            else:
+                return images[0]
         elif len(images) == 0:
             return {}
         else:
             raise RuntimeError("This should not happen!")
 
     def get_container(self):
-        containers = self.dc.containers(filters={'name': self.name}, all=True)
+        containers = self.dc.containers(
+            filters={'name': "^/{}$".format(self.name)}, all=True)
         if len(containers) == 1:
             return containers[0]
         elif len(containers) == 0:

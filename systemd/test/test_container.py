@@ -21,6 +21,7 @@ VOLUME ["/data"]
 CMD /bin/sh -c 'echo hello world; sleep 10'
     '''
 
+
 configure_logger(test=True, verbosity=1)
 log = logging.getLogger(docker_meta.__name__)
 
@@ -57,6 +58,12 @@ class TestWithDockerDaemon(object):
         except:
             pass
 
+    def build_instructions(self):
+        return {
+            'fileobj': BytesIO(test_dockerfile.encode('utf-8')),
+            'tag': self.testimage,
+            }
+
     def test_container_non_existent(self):
         container = DockerContainer(self.cli, 'test', {})
         with pytest.raises(RuntimeError):
@@ -64,12 +71,8 @@ class TestWithDockerDaemon(object):
 
     def test_container_backup_restore(self, tmpdir):
         configure_logger(test=True, verbosity=1)
-        build_instructions = {
-            'fileobj': BytesIO(test_dockerfile.encode('utf-8')),
-            'tag': self.testimage,
-            }
         container = DockerContainer(
-            self.cli, self.testcontainer, {}, {}, build_instructions)
+            self.cli, self.testcontainer, {}, {}, self.build_instructions())
         container.create()
 
         container.manipulate_volumes(
@@ -103,6 +106,17 @@ class TestWithDockerDaemon(object):
 
         assert last_info_line(3)[0] == "empty_file"
 
+    def test_container_get_image(self):
+        container = DockerContainer(
+            self.cli, self.testcontainer, {}, {}, self.build_instructions())
+        container.build_image()
+
+        assert container.get_image(self.testimage)
+        assert container.get_image('{}:latest'.format(self.testimage))
+        assert container.get_image()
+        assert not container.get_image('{}:othertag'.format(self.testimage))
+        assert not container.get_image('non-existent')
+
     def test_container_creation(self):
         creation = {'image': self.testimage}
         container = DockerContainer(self.cli, self.testcontainer, creation)
@@ -134,7 +148,13 @@ class TestWithDockerDaemon(object):
 
         assert not container.get_container()
         container.start()
+
         assert container.get_container()
+
+        # make sure, that containers with subset of the name are not found
+        sub_name_container = DockerContainer(
+            self.cli, self.testcontainer[2:-2])
+        assert not sub_name_container.get_container()
 
         container.start(restart=True, timeout=0)
         time.sleep(0.01)

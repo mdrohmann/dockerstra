@@ -59,6 +59,6 @@ if __name__ == "__main__":
         configurations, order_list = read_configuration(args.configfile)
         run_configuration(configurations, order_list, dc, args.stop_all)
     except:
-        log.error("Failed to execute the recipe")
+        log.error("Failed to execute the recipe.", exc_info=1)
 
 # vim:set ft=python sw=4 et spell spelllang=en:
