@@ -1,0 +1,5 @@
+.git
+README.md
+certs/
+conf.d/
+test_configuration.yaml
