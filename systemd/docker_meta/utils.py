@@ -47,7 +47,7 @@ def spawnProcess(
             raise RuntimeError(
                 "Twisted is not installed.  Please install or use subprocess")
 
-        sp = SpawnProtocol(outhandler, errhandler, kill_reactor=True)
+        sp = SpawnProtocol(outhandler, errhandler, kill_reactor=False)
         reactor.spawnProcess(sp, run_args[0], run_args)
         return sp.deferred
     else:
