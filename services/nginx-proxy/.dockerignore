@@ -2,4 +2,5 @@
 README.md
 certs/
 conf.d/
+tests/
 test_configuration.yaml

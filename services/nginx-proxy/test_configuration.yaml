@@ -34,7 +34,7 @@ cgit_proxied_ssl:
         path: services/cgit
         tag: mdrohmann/cgit
     creation:
-        name: cgit_proxied
+        name: ssl_cgit_proxied
         environment:
             VIRTUAL_HOST: ssl.cgit.main
     startup:
@@ -48,7 +48,7 @@ ssl_cgit_proxied_ssl:
         path: services/cgit
         tag: mdrohmann/cgit
     creation:
-        name: cgit_proxied
+        name: ssl_cgit_proxied_ssl
         environment:
             VIRTUAL_HOST: ssl2.cgit.main
             VIRTUAL_PROTO: https
@@ -62,7 +62,6 @@ ssl_cgit_proxied_ssl:
 -
     nginx_proxy:
         command: start
-        restart: True
 -
     cgit_proxied:
         command: start
@@ -72,3 +71,6 @@ ssl_cgit_proxied_ssl:
 -
     ssl_cgit_proxied_ssl:
         command: start
+-
+    host:
+        command: py.test --twisted tests/
