@@ -1,6 +1,9 @@
 import logging
 import os
+import re
 import time
+from cStringIO import StringIO
+
 import utils
 
 import docker
@@ -20,10 +23,33 @@ __version__ = get_distribution(__name__).version
 log = logging.getLogger(__name__)
 
 
-def read_configuration(configfile):
+def environment_substutions(fh, buf, environment={}):
+    pattern = re.compile(r'({{[^}]*}})')
+    for s in fh.readlines():
+        for res in reversed(list(pattern.finditer(s))):
+            key = res.group()[2:-2].strip()
+            value = environment.get(key, os.getenv(key))
+            if value:
+                s = s[:res.start()] + value + s[res.end():]
+        buf.write(s)
+
+    buf.seek(0)
+
+
+def read_configuration(configfile, environment={}):
+    if type(environment) == basestring:
+        if environment:
+            with open(environment, 'r') as fh:
+                environment = yaml.load(fh)
+        else:
+            environment = {}
+
+    buf = StringIO()
     with open(configfile, 'r') as fh:
-        configs = yaml.load_all(fh)
-        configs = list(configs)
+        environment_substutions(fh, buf, environment)
+
+    configs = yaml.load_all(buf)
+    configs = list(configs)
 
     order_list = configs[1]
     configurations = configs[0]
@@ -47,6 +73,7 @@ def run_configuration(configurations, order_list, dc, stop_all=False):
         container = DockerContainer(dc, name, **c)
 
         timeout = orders.pop('timeout', 10)
+        wait_time = orders.pop('wait', 0)
 
         if stop_all:
             cmd = 'stop'
@@ -62,21 +89,27 @@ def run_configuration(configurations, order_list, dc, stop_all=False):
             container.start(restart, timeout)
         elif cmd == 'restore':
             restore_dir = os.path.abspath(orders.get('restore_dir', '.'))
-            container.restore(restore_dir, orders['restore_name'])
+            restore_name = orders.get('restore_name', 'backup')
+            container.restore(restore_dir, restore_name)
         elif cmd == 'backup':
-            backup_dir = os.path.abspath(orders.get('backup_dir', ','))
-            container.backup(
-                orders['source'], backup_dir, orders['backup_name'])
+            backup_dir = os.path.abspath(orders.get('backup_dir', '.'))
+            source_dir = orders.get('source', '/')
+            backup_name = orders.get('backup_name', 'backup')
+            overwrite = orders.get('overwrite', False)
+            container.backup(source_dir, backup_dir, backup_name, overwrite)
         elif cmd == 'stop':
             container.stop(timeout)
         elif cmd == 'remove':
             v = orders.pop('v', True)
             container.remove(v, timeout)
+        elif cmd == 'execute':
+            shell = orders.pop('shell', False)
+            binds = orders.pop('binds', {})
+            container.execute(orders['run'], shell, binds)
         else:
             raise ValueError(
                 "Invalid command {} for container {}".format(cmd, name))
 
-        wait_time = orders.get('wait', 0)
         time.sleep(wait_time)
 
 
@@ -214,6 +247,53 @@ class DockerContainer(object):
     def _log_output(self, line, command):
         log.info(line, extra={'type': 'output', 'cmd': command, 'dc': self})
 
+    def inspect(self):
+        return self.dc.inspect_container(self.name)
+
+    def _substitute_run_args(self, args):
+        new_args = []
+        pattern = re.compile(
+            '^{{(?P<formula>.*)}}(\((?P<container>[^)]*)\))?$')
+        for arg in args:
+            res = pattern.match(arg.strip())
+            if res:
+                gd = res.groupdict()
+                if gd['container']:
+                    if gd['container'].startswith('image://'):
+                        inspect = self.dc.inspect_image(gd['container'][8:])
+                    else:
+                        inspect = self.dc.inspect_container(gd['container'])
+                else:
+                    inspect = self.dc.inspect_container(self.name)
+
+                new_arg = eval(res.groups()[0], {}, {'inspect': inspect})
+            else:
+                new_arg = arg
+
+            if type(new_arg) == list:
+                new_args += new_arg
+            else:
+                new_args.append(new_arg)
+        return new_args
+
+    def execute(self, run_args, shell=False, binds={}):
+        self._substitute_run_args(run_args)
+
+        if self.name == 'host':
+
+            ret = utils.spawnProcess(
+                run_args,
+                outhandler=lambda data: self._log_output(data, 'execute'),
+                errhandler=log.error,
+                shell=shell)
+            if ret != 0:
+                raise RuntimeError(
+                    "Execution of {} failed with error code {}"
+                    .format(' '.join(run_args), ret))
+            return ret
+        else:
+            self.manipulate_volumes(run_args, binds)
+
     def create(self):
         if (not self.creation) and (not self.build):
             raise RuntimeError(
@@ -284,7 +364,17 @@ class DockerContainer(object):
             "Successfully executed command {} in container {}."
             .format(command, self.name))
 
-    def backup(self, source, target_dir, target_name):
+    def backup(self, source, target_dir, target_name, overwrite=False):
+        targetfile = os.path.join(target_dir, '{}.tar'.format(target_name))
+        gzipped_target_file = '{}.gz'.format(targetfile)
+        if not overwrite and (
+                os.path.exists(targetfile)
+                or os.path.exists(gzipped_target_file)):
+            raise RuntimeError(
+                "Backup failed: The target {} exists already in directory {}. "
+                "Add 'overwrite=True' to orders to overwrite"
+                .format(target_name, target_dir))
+
         log.info(
             "Backup of container {}: {} -> {}/{}"
             .format(self.name, source, target_dir, target_name))
@@ -325,7 +415,8 @@ class DockerContainer(object):
             log.info("Successfully stopped container {}".format(self.name))
         else:
             log.debug(
-                "Not stopping container {} as it was not running".format(self.name))
+                "Not stopping container {} as it was not running"
+                .format(self.name))
 
     def remove(self, v=True, timeout=10):
         self.stop(timeout)
@@ -335,6 +426,7 @@ class DockerContainer(object):
             log.info("Successfully removed container {}".format(self.name))
         else:
             log.debug(
-                "Not removing container {} as it did not exist.".format(self.name))
+                "Not removing container {} as it did not exist."
+                .format(self.name))
 
 # vim:set ft=python sw=4 et spell spelllang=en:

@@ -49,8 +49,7 @@ def spawnProcess(
 
         sp = SpawnProtocol(outhandler, errhandler, kill_reactor=True)
         reactor.spawnProcess(sp, run_args[0], run_args)
-        reactor.run()
-        return sp.returncode
+        return sp.deferred
     else:
         stderr = subprocess.PIPE
         if errhandler is None:
@@ -74,11 +73,12 @@ def spawnProcess(
                         errhandler(line)
         # theoretically, we could have missed the final output...
         orest = p.stdout.read()
-        erest = p.stderr.read()
         if orest:
             outhandler(orest)
-        if erest:
-            outhandler(erest)
+        if errhandler:
+            erest = p.stderr.read()
+            if erest:
+                errhandler(erest)
         p.communicate()
 
         return p.returncode
