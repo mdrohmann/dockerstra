@@ -21,9 +21,18 @@ import: dev_servers_startup.yaml
         - --remove
         - -o
         - {{DOCKER_REPO}}/services/nginx/etc
-        - cgit
-        - gitolite
-        - pypicloud
+        - cgit.main:cgit
+        - pypi-internal.main:pypicloud
+-
+  host:
+      command: execute
+      run:
+          - /usr/bin/python
+          - {{DOCKER_REPO}}/systemd/scripts/hosts_gen.py
+          - --remove
+          - -c
+          - {{DOCKER_REPO}}/systemd/configfiles/host_scenarios.yaml
+          - dev_servers
 -
   nginx:
       command: start
