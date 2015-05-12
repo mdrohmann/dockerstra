@@ -6,4 +6,5 @@ certs/
 conf.d/
 tests/
 test_configuration.yaml
+test_clean.yaml
 .ropeproject

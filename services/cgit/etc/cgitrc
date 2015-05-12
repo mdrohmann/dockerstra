@@ -117,6 +117,7 @@ readme=:INSTALL.txt
 readme=:install.txt
 readme=:INSTALL
 readme=:install
+readme=:index.rst
 
 
 ##
@@ -161,7 +162,7 @@ repo.owner="Martin C. Drohmann <mdrohmann@gmail.com>"
 
 repo.url=docker
 repo.path=/repositories/docker.git
-repo.desc=docker services and data files
+repo.desc=Docker services and data files plus docker_meta
 repo.owner="Martin C. Drohmann <mdrohmann@gmail.com>"
 
 # The next repositories will be displayed under the 'extras' heading

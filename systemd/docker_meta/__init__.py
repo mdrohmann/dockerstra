@@ -53,9 +53,19 @@ def read_configuration(configfile, environment={}):
     order_list = configs[1]
     configurations = configs[0]
     configdir = os.path.abspath(os.path.dirname(configfile))
-    if len(configurations) == 1 and 'import' in configurations:
-        parent_file = os.path.join(configdir, configurations['import'])
-        configurations, _, _ = read_configuration(parent_file)
+    if 'import' in configurations:
+        imported = {}
+        importfiles = configurations.pop('import')
+        if isinstance(importfiles, basestring):
+            importfiles = [importfiles]
+
+        for importfile in importfiles:
+            parent_file = os.path.join(configdir, importfile)
+            tmp_imported, _, _ = read_configuration(parent_file)
+            imported.update(tmp_imported)
+
+        imported.update(configurations)
+        configurations = imported
 
     return configurations, order_list, configdir
 
@@ -80,6 +90,9 @@ def run_configuration(
         if stop_all:
             cmd = 'stop'
             timeout = 0
+
+            if name == 'host':
+                continue
 
         log.info('Executing step {} on {}'.format(cmd, name))
         if cmd == 'build':
@@ -437,6 +450,12 @@ class DockerContainer(object):
 
     def stop(self, timeout=10):
         container = self.get_container()
+        if not container:
+            log.debug(
+                "Trying to stop container {}, but it has not been created. "
+                "(skipping)"
+                .format(self.name))
+            return
         if self.is_started():
             self.dc.stop(container, timeout)
             log.info("Successfully stopped container {}".format(self.name))

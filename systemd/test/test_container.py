@@ -188,8 +188,41 @@ def test_container_configuration_fail():
             {}, [{'x1': {'command': 'execute'}}], '.', None)
         assert e.message.startswith('Could not find a configuration for')
 
+default_events = [
+    ('start', ['x3', False, 10]), 12,
+    ('create', ['x2']), 0,
+    ('build_image', ['x1']), 0,
+    ('backup', ['x1', '/volume', os.getcwd(), 'testbackup', False]), 0,
+    ('restore', ['x1', os.getcwd(), 'testbackup']), 0,
+    ('stop', ['x1', 3]), 0,
+    ('remove', ['x1', False, 10]), 0,
+    ('backup', ['x2', '/', os.getcwd(), 'backup', False]), 0,
+    ('restore', ['x2', os.getcwd(), 'backup']), 0,
+    ('execute', ['x2', ['rm', '/var/cache'], False, {}]), 0,
+    ('execute', ['host', ['echo', 'hallo'], True, {}]), 0,
+    ]
 
-def test_container_configuration(monkeypatch):
+stop_all_events = [
+    ('stop', ['x3', 0]), 12,
+    ('stop', ['x2', 0]), 0,
+    ('stop', ['x1', 0]), 0,
+    ('stop', ['x1', 0]), 0,
+    ('stop', ['x1', 0]), 0,
+    ('stop', ['x1', 0]), 0,
+    ('stop', ['x1', 0]), 0,
+    ('stop', ['x2', 0]), 0,
+    ('stop', ['x2', 0]), 0,
+    ('stop', ['x2', 0]), 0,
+    ]
+
+
+@pytest.mark.parametrize(
+    'stop_all, expected',
+    [(False, default_events),
+     (True, stop_all_events),
+     ],
+    ids=['default', 'stop_all'])
+def test_container_configuration(monkeypatch, stop_all, expected):
     events = []
     monkeypatch.setattr(time, 'sleep', lambda x: events.append(x))
 
@@ -251,22 +284,16 @@ def test_container_configuration(monkeypatch):
                 'command': 'execute',
                 'run': ['rm', '/var/cache'],
             }},
+            {'host': {
+                'command': 'execute',
+                'run': ['echo', 'hallo'],
+                'shell': True,
+            }},
         ],
         '.',
-        None)
+        None, stop_all=stop_all)
 
-    assert events == [
-        ('start', ['x3', False, 10]), 12,
-        ('create', ['x2']), 0,
-        ('build_image', ['x1']), 0,
-        ('backup', ['x1', '/volume', os.getcwd(), 'testbackup', False]), 0,
-        ('restore', ['x1', os.getcwd(), 'testbackup']), 0,
-        ('stop', ['x1', 3]), 0,
-        ('remove', ['x1', False, 10]), 0,
-        ('backup', ['x2', '/', os.getcwd(), 'backup', False]), 0,
-        ('restore', ['x2', os.getcwd(), 'backup']), 0,
-        ('execute', ['x2', ['rm', '/var/cache'], False, {}]), 0,
-        ]
+    assert events == expected
 
 
 def test_execute_on_host():
@@ -412,13 +439,35 @@ x1: abc
     testyaml2 = tmpdir.join('test2.yaml')
     testyaml2.write("""
 import: test.yaml
+x2: def
+x1: jkl
 ---
 -
     x1:
        command: backup
 """)
+    expect2 = {'x1': 'jkl', 'x2': 'def'}
     configurations, order_list, _ = read_configuration(str(testyaml2))
-    assert configurations == expect
+    assert configurations == expect2
+    assert order_list == [{'x1': {'command': 'backup'}}]
+
+    testyaml31 = tmpdir.join('test31.yaml')
+    testyaml31.write("""
+x3: ghi
+---
+""")
+
+    testyaml3 = tmpdir.join('test3.yaml')
+    testyaml3.write("""
+import: ["test.yaml", "test31.yaml"]
+---
+-
+    x1:
+       command: backup
+""")
+    expect3 = {'x1': 'abc', 'x3': 'ghi'}
+    configurations, order_list, _ = read_configuration(str(testyaml3))
+    assert configurations == expect3
     assert order_list == [{'x1': {'command': 'backup'}}]
 
 

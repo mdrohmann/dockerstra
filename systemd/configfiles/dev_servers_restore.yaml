@@ -1,12 +1,12 @@
-import: juergen_startup.yaml
+import: dev_servers_startup.yaml
 ---
 -
   git_repos:
     command: restore
-    restore_dir: /home/martin/docker_backup
+    restore_dir: {{BACKUPDIR}}/dev_servers
     restore_name: git_repos
 -
   data_pypi:
     command: restore
-    restore_dir: /home/martin/docker_backup
+    restore_dir: {{BACKUPDIR}}/dev_servers
     restore_name: pypicloud

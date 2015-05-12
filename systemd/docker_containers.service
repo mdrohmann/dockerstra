@@ -7,9 +7,9 @@ Wants=docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/home/martin/gistin/docker/
-ExecStart=/usr/bin/python /usr/local/bin/docker_start.py systemd/configfiles/juergen_startup.yaml
-ExecStop=/usr/bin/python /usr/local/bin/docker_start.py --stop-all systemd/configfiles/juergen_startup.yaml
+WorkingDirectory=/home/martin/gistin/docker/systemd/configfiles
+ExecStart=/usr/bin/python /usr/local/bin/docker_start.py -e juergen_environment.yaml dev_servers_startup.yaml
+ExecStop=/usr/bin/python /usr/local/bin/docker_start.py --stop-all -e juergen_environment.yaml dev_servers_startup.yaml
 
 [Install]
 WantedBy=mutli-user.target
