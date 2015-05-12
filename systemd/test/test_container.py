@@ -422,19 +422,26 @@ import: test.yaml
     assert order_list == [{'x1': {'command': 'backup'}}]
 
 
-def test_startup_manipulation():
-    bind_path_host = '${CONFIG_DIR}/path'
-    bind_container = {'binds': 'path', 'ro': True}
-    startup = {
-        'other_key': 'other_value',
-        'binds': {bind_path_host: bind_container},
-    }
-    build = {'path': '/other_path'}
-    dc = DockerContainer(None, 'test', startup=startup, build=build)
-    new_key_expected = os.path.abspath('/other_path/path')
-    assert dc.startup['binds'].keys() == [new_key_expected]
-    assert dc.startup['binds'][new_key_expected] == bind_container
-    assert 'other_key' in dc.startup
+def test_startup_manipulation(tmpdir):
+    with tmpdir.as_cwd():
+        os.mkdir(str(tmpdir.join('path')))
+        bind_path_host = '${CONFIG_DIR}/path'
+        bind_container = {'binds': 'path', 'ro': True}
+        startup = {
+            'other_key': 'other_value',
+            'binds': {bind_path_host: bind_container},
+        }
+        build = {'path': str(tmpdir)}
+        dc = DockerContainer(None, 'test', startup=startup, build=build)
+        new_key_expected = str(tmpdir.join('path'))
+        assert dc.startup['binds'].keys() == [new_key_expected]
+        assert dc.startup['binds'][new_key_expected] == bind_container
+        assert 'other_key' in dc.startup
+        os.rmdir(str(tmpdir.join('path')))
+
+    # It fails, if the bind directory does not exist...
+    with pytest.raises(ValueError):
+        dc = DockerContainer(None, 'test', startup=startup, build=build)
 
 
 def test_creation_manipulation():
