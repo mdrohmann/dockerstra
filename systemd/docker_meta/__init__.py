@@ -318,16 +318,17 @@ class DockerContainer(object):
 
         if self.name == 'host':
 
+            cwd = self._configdir()
             ret = utils.spawnProcess(
                 run_args,
                 outhandler=lambda data: self._log_output(data, 'execute'),
-                errhandler=log.error,
-                cwd=self._configdir(),
+                errhandler=lambda data: log.error(data.strip()),
+                cwd=cwd,
                 shell=shell)
             if ret != 0:
                 raise RuntimeError(
-                    "Execution of {} failed with error code {}"
-                    .format(' '.join(run_args), ret))
+                    "Execution of {} failed with error code {} (cwd={})"
+                    .format(' '.join(run_args), ret, cwd))
             return ret
         else:
             self.manipulate_volumes(run_args, binds)
