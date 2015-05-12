@@ -52,13 +52,12 @@ def read_configuration(configfile, environment={}):
 
     order_list = configs[1]
     configurations = configs[0]
+    configdir = os.path.abspath(os.path.dirname(configfile))
     if len(configurations) == 1 and 'import' in configurations:
-        parent_file = os.path.abspath(
-            os.path.join(
-                os.path.dirname(configfile), configurations['import']))
+        parent_file = os.path.join(configdir, configurations['import'])
         configurations, _, _ = read_configuration(parent_file)
 
-    return configurations, order_list, os.path.dirname(configfile)
+    return configurations, order_list, configdir
 
 
 def run_configuration(
@@ -159,6 +158,10 @@ class DockerContainer(object):
             for fro, to in binds.iteritems():
                 nfro = self._path_substitutions(fro)
                 nbinds[nfro] = to
+                if not os.path.exists(nfro):
+                    raise ValueError(
+                        "The path {} to bind to, does not exist, maybe you "
+                        "started in the wrong directory?".format(nfro))
             self.startup['binds'] = nbinds
 
     def _update_creation_config(self):
