@@ -1,0 +1,18 @@
+import: test_configuration.yaml
+---
+-
+    nginx_proxy:
+        command: remove
+        timeout: 0
+-
+    cgit_proxied:
+        command: remove
+        timeout: 0
+-
+    cgit_proxied_ssl:
+        command: remove
+        timeout: 0
+-
+    ssl_cgit_proxied_ssl:
+        command: remove
+        timeout: 0
