@@ -33,7 +33,7 @@ cgit:
         volumes_from: git_repos
         port_bindings: {80: 12345}
         binds:
-            ${PWD}/etc:
+            ${CONFIG_DIR}/etc:
                 bind: '/data'
                 ro: False
 
@@ -46,7 +46,7 @@ pypicloud:
     startup:
         volumes_from: data_pypi
         binds:
-            ${PWD}/pypicloud:
+            ${CONFIG_DIR}/pypicloud:
                 bind: /etc/pypicloud
                 ro: False
         port_bindings: {3031: 3031}
