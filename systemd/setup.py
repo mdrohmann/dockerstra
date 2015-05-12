@@ -30,7 +30,7 @@ setup(
     author='Martin C Drohmann',
     author_email='mcd@askthevotegoat.com',
     scripts=['scripts/docker_start.py'],
-    version='1.1',
+    version='1.2',
     install_requires=['docker-py', 'pyyaml'],
     license='LICENSE',
     packages=find_packages(),
