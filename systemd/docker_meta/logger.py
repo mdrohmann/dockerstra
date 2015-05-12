@@ -32,9 +32,8 @@ class OutputFilter(logging.Filter):
                     return False
                 record.msg = md.get('stream', '')
 
-            # just a placeholder in case we want to more interesting things.
             elif record.cmd == 'execute':
-                pass
+                record.msg = record.msg.strip()
 
             elif record.cmd == 'create_container':
                 record.msg = 'Created image with Id {}'.format(msg['Id'])

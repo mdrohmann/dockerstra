@@ -67,7 +67,10 @@ def run_configuration(configurations, order_list, dc, stop_all=False):
     for item in order_list:
 
         name, orders = item.items()[0]
-        c = configurations[name]
+        c = configurations.get(name, {})
+        if not c and name != 'host':
+            raise RuntimeError(
+                "Could not find a configuration for container {}".format(name))
         cmd = orders['command']
 
         container = DockerContainer(dc, name, **c)
