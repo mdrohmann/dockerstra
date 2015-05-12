@@ -59,10 +59,11 @@ if __name__ == "__main__":
     dc = docker.Client(args.daemon)
 
     try:
-        configurations, order_list = read_configuration(
+        configurations, order_list, config_dir = read_configuration(
             args.configfile, args.environment)
 
-        run_configuration(configurations, order_list, dc, args.stop_all)
+        run_configuration(
+            configurations, order_list, config_dir, dc, args.stop_all)
     except:
         log.error("Failed to execute the recipe.", exc_info=1)
 

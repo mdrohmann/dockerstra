@@ -178,9 +178,15 @@ class TestWithDockerDaemon(object):
 
 def test_container_configuration_fail():
 
-    # There should be more tests...
-    with pytest.raises(ValueError):
-        run_configuration({'x1': {}}, [{'x1': {'command': 'invalid'}}], None)
+    with pytest.raises(ValueError) as e:
+        run_configuration(
+            {'x1': {'build': 1}}, [{'x1': {'command': 'invalid'}}], '.', None)
+        assert e.message.startswith('Invalid command invalid')
+
+    with pytest.raises(ValueError) as e:
+        run_configuration(
+            {}, [{'x1': {'command': 'execute'}}], '.', None)
+        assert e.message.startswith('Could not find a configuration for')
 
 
 def test_container_configuration(monkeypatch):
@@ -246,6 +252,7 @@ def test_container_configuration(monkeypatch):
                 'run': ['rm', '/var/cache'],
             }},
         ],
+        '.',
         None)
 
     assert events == [
@@ -328,21 +335,24 @@ def test_substitute_run_args(container_handle, expected_name):
     assert res[1] == '172.17.42.1'
     assert set(res[2:]) == set(['80', '443'])
 
+
 def test_environment_substitution(tmpdir):
     testyaml = tmpdir.join('test.yaml')
     os.environ['HOSTNAME'] = 'dummy'
-    environment = {
-        'BASEDIR': str(tmpdir),
-        'COMMAND': 'start',
-        'abc': 'hello_world',
-    }
+    envyaml = tmpdir.join('env.yaml')
+    abc_value = 'hello world'
+    envyaml.write("""
+BASEDIR: """ + str(tmpdir) + """
+COMMAND: start
+abc: """ + abc_value)
+
     testyaml.write("""
 {{HOSTNAME}}/cgit:
     build:
         path: {{BASEDIR}}/services/{{abc}}/cgit
     startup:
         binds:
-            ${PWD}/test:
+            ${CONFIG_DIR}/test:
                 bind: /var/test
                 ro: False
 ---
@@ -356,18 +366,19 @@ def test_environment_substitution(tmpdir):
             - my_script
             - "{{.NetworkSettings.IPAddress}}({{HOSTNAME}}/cgit)"
 """)
-    configuration, order_list = read_configuration(str(testyaml), environment)
+    configuration, order_list, config_dir = read_configuration(
+        str(testyaml), str(envyaml))
     c_expected = {
         'dummy/cgit': {
             'build': {
                 'path': (
                     '{}/services/{}/cgit'
-                    .format(str(tmpdir), environment['abc'])
+                    .format(str(tmpdir), abc_value)
                 ),
             },
             'startup': {
                 'binds': {
-                    '${PWD}/test': {'bind': '/var/test', 'ro': False}
+                    '${CONFIG_DIR}/test': {'bind': '/var/test', 'ro': False}
                 }
             }
         }
@@ -392,10 +403,11 @@ x1: abc
     x1:
         command: start
 """)
-    configurations, order_list = read_configuration(str(testyaml))
+    configurations, order_list, config_dir = read_configuration(str(testyaml))
     expect = {'x1': 'abc'}
     assert configurations == expect
     assert order_list == [{'x1': {'command': 'start'}}]
+    assert config_dir == str(tmpdir)
 
     testyaml2 = tmpdir.join('test2.yaml')
     testyaml2.write("""
@@ -405,13 +417,13 @@ import: test.yaml
     x1:
        command: backup
 """)
-    configurations, order_list = read_configuration(str(testyaml2))
+    configurations, order_list, _ = read_configuration(str(testyaml2))
     assert configurations == expect
     assert order_list == [{'x1': {'command': 'backup'}}]
 
 
 def test_startup_manipulation():
-    bind_path_host = '${PWD}/path'
+    bind_path_host = '${CONFIG_DIR}/path'
     bind_container = {'binds': 'path', 'ro': True}
     startup = {
         'other_key': 'other_value',
@@ -423,17 +435,6 @@ def test_startup_manipulation():
     assert dc.startup['binds'].keys() == [new_key_expected]
     assert dc.startup['binds'][new_key_expected] == bind_container
     assert 'other_key' in dc.startup
-
-
-def test_startup_manipulation_error():
-    bind_path_host = '${PWD}/path'
-    bind_container = {'binds': 'path', 'ro': True}
-    startup = {
-        'other_key': 'other_value',
-        'binds': {bind_path_host: bind_container},
-    }
-    with pytest.raises(ValueError):
-        DockerContainer(None, 'test', startup=startup)
 
 
 def test_creation_manipulation():

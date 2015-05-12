@@ -19,7 +19,6 @@ __all__ = [
 __version__ = get_distribution(__name__).version
 
 
-# logging.getLogger(__name__).addHandler(logging.NullHandler)
 log = logging.getLogger(__name__)
 
 
@@ -37,7 +36,7 @@ def environment_substutions(fh, buf, environment={}):
 
 
 def read_configuration(configfile, environment={}):
-    if type(environment) == basestring:
+    if isinstance(environment, basestring):
         if environment:
             with open(environment, 'r') as fh:
                 environment = yaml.load(fh)
@@ -57,23 +56,24 @@ def read_configuration(configfile, environment={}):
         parent_file = os.path.abspath(
             os.path.join(
                 os.path.dirname(configfile), configurations['import']))
-        configurations, _ = read_configuration(parent_file)
+        configurations, _, _ = read_configuration(parent_file)
 
-    return configurations, order_list
+    return configurations, order_list, os.path.dirname(configfile)
 
 
-def run_configuration(configurations, order_list, dc, stop_all=False):
+def run_configuration(
+        configurations, order_list, config_dir, dc, stop_all=False):
 
     for item in order_list:
 
         name, orders = item.items()[0]
         c = configurations.get(name, {})
         if not c and name != 'host':
-            raise RuntimeError(
+            raise ValueError(
                 "Could not find a configuration for container {}".format(name))
         cmd = orders['command']
 
-        container = DockerContainer(dc, name, **c)
+        container = DockerContainer(dc, name, config_dir=config_dir, **c)
 
         timeout = orders.pop('timeout', 10)
         wait_time = orders.pop('wait', 0)
@@ -118,28 +118,46 @@ def run_configuration(configurations, order_list, dc, stop_all=False):
 
 class DockerContainer(object):
 
-    def __init__(self, dc, name, creation={}, startup={}, build={}):
+    def __init__(
+            self, dc, name, creation={}, startup={}, build={}, config_dir='.'):
+
         self.dc = dc
         self.name = name
         self.creation = creation
         self.startup = startup
         self.build = build
+        self.config_dir = config_dir
         self._update_start_config()
         self._update_creation_config()
         log.debug("Initialized docker container {}".format(name))
+
+    def _configdir(self):
+        return os.path.abspath(self.build.get('path', self.config_dir))
+
+    def _path_substitutions(self, fro):
+        """
+        substitutes container-specific environment variables.
+
+        The only possible environment variable is ${CONFIG_DIR} at the moment.
+        It is substituted with the containers build path.  If the build path is
+        not specified, the configuration file's directory is used.  If this has
+        not been specified either, our fall-back is the current directory.
+        """
+        config_dir = self._configdir()
+
+        nfro = fro.replace('${CONFIG_DIR}', config_dir)
+        if nfro != fro:
+            log.debug(
+                'Replaced ${{CONFIG_DIR}} in {} with {}.'
+                .format(fro, config_dir))
+        return nfro
 
     def _update_start_config(self):
         if 'binds' in self.startup:
             binds = self.startup['binds']
             nbinds = {}
             for fro, to in binds.iteritems():
-                if 'path' not in self.build:
-                    raise ValueError(
-                        "The path key needs to be specified for ${{PWD}} "
-                        "replacement in startup configuration of {name}"
-                        .format(name=self.name))
-                nfro = fro.replace(
-                    '${PWD}', os.path.abspath(self.build['path']))
+                nfro = self._path_substitutions(fro)
                 nbinds[nfro] = to
             self.startup['binds'] = nbinds
 
@@ -288,6 +306,7 @@ class DockerContainer(object):
                 run_args,
                 outhandler=lambda data: self._log_output(data, 'execute'),
                 errhandler=log.error,
+                cwd=self._configdir(),
                 shell=shell)
             if ret != 0:
                 raise RuntimeError(
@@ -368,6 +387,7 @@ class DockerContainer(object):
             .format(command, self.name))
 
     def backup(self, source, target_dir, target_name, overwrite=False):
+        target_dir = self._path_substitutions(target_dir)
         targetfile = os.path.join(target_dir, '{}.tar'.format(target_name))
         gzipped_target_file = '{}.gz'.format(targetfile)
         if not overwrite and (
@@ -389,6 +409,7 @@ class DockerContainer(object):
         return res
 
     def restore(self, restore_dir, restore_name):
+        restore_dir = self._path_substitutions(restore_dir)
         log.info(
             "Restoring container {} from {}/{}"
             .format(self.name, restore_dir, restore_name))
