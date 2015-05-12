@@ -163,6 +163,7 @@ repo.url=docker
 repo.path=/repositories/docker.git
 repo.desc=docker services and data files
 repo.owner="Martin C. Drohmann <mdrohmann@gmail.com>"
+repo.readme="master:index.rst"
 
 # The next repositories will be displayed under the 'extras' heading
 section=extras
