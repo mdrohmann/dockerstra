@@ -29,7 +29,10 @@ setup(
     description='Automatically start docker containers',
     author='Martin C Drohmann',
     author_email='mcd@askthevotegoat.com',
-    scripts=['scripts/docker_start.py'],
+    scripts=[
+        'scripts/docker_start.py',
+        'scripts/nginx_gen.py',
+        'scripts/hosts_gen.py'],
     version='1.2',
     install_requires=['docker-py', 'pyyaml'],
     license='LICENSE',
