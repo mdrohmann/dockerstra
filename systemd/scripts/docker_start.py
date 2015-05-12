@@ -21,7 +21,7 @@ def create_parser():
         '-v', '--verbose', action='count',
         help='verbosity level')
     parser.add_argument(
-        '-e', '--environment', type=str,
+        '-e', '--environment', type=str, default='',
         help='Filename of YAML file with environment variables')
     parser.add_argument(
         '-d', '--debug', action='store_true',
