@@ -1,6 +1,9 @@
 .git
 README.md
+LICENSE
+Makefile
 certs/
 conf.d/
 tests/
 test_configuration.yaml
+.ropeproject
