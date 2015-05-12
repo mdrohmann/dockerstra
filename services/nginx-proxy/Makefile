@@ -1,5 +1,5 @@
 .PHONY: test
 
 test:
-	workon voteapp
-	py.test --twisted tests
+	. /home/martin/Envs/voteapp/bin/activate && \
+		py.test -vv --twisted tests

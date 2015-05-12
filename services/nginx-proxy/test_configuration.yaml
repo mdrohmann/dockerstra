@@ -1,6 +1,6 @@
 nginx_proxy:
     build:
-        path: services/nginx-proxy
+        path: {{DOCKER_REPO}}/services/nginx-proxy
         tag: mdrohmann/nginx-proxy
     creation:
         name: nginx_proxy
@@ -17,7 +17,7 @@ nginx_proxy:
                 ro: True
 cgit_proxied:
     build:
-        path: services/cgit
+        path: {{DOCKER_REPO}}/services/cgit
         tag: mdrohmann/cgit
     creation:
         name: cgit_proxied
@@ -31,7 +31,7 @@ cgit_proxied:
                 ro: False
 cgit_proxied_ssl:
     build:
-        path: services/cgit
+        path: {{DOCKER_REPO}}/services/cgit
         tag: mdrohmann/cgit
     creation:
         name: ssl_cgit_proxied
@@ -45,7 +45,7 @@ cgit_proxied_ssl:
                 ro: False
 ssl_cgit_proxied_ssl:
     build:
-        path: services/cgit
+        path: {{DOCKER_REPO}}/services/cgit
         tag: mdrohmann/cgit
     creation:
         name: ssl_cgit_proxied_ssl
