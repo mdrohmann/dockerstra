@@ -1,20 +1,20 @@
 git_repos:
     build:
-        path: data/repositories
+        path: {{DOCKER_REPO}}/data/repositories
         tag: data/repositories
     creation:
         name: git_repos
 
 data_pypi:
     build:
-        path: data/pypicloud
+        path: {{DOCKER_REPO}}/data/pypicloud
         tag: data/pypicloud
     creation:
         name: pypi_data
 
 gitolite:
     build:
-        path: services/gitolite
+        path: {{DOCKER_REPO}}/services/gitolite
         tag: mdrohmann/gitolite
     creation:
         name: gitolite
@@ -25,7 +25,7 @@ gitolite:
 
 cgit:
     build:
-        path: services/cgit
+        path: {{DOCKER_REPO}}/services/cgit
         tag: mdrohmann/cgit
     creation:
         name: cgit
@@ -39,7 +39,7 @@ cgit:
 
 pypicloud:
     build:
-        path: services/pypicloud
+        path: {{DOCKER_REPO}}/services/pypicloud
         tag: mdrohmann/pypicloud
     creation:
         name: pypicloud
@@ -53,7 +53,7 @@ pypicloud:
 
 apt-cacher-ng:
     build:
-        path: services/apt-cacher-ng
+        path: {{DOCKER_REPO}}/services/apt-cacher-ng
         tag: mdrohmann/apt-cacher-ng
     creation:
         name: apt-cacher-ng

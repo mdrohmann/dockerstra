@@ -1,7 +1,0 @@
-import: juergen_startup.yaml
----
--
-  git_repos:
-      command: restore
-      restore_dir: '.'
-      restore_name: 'old_repos'

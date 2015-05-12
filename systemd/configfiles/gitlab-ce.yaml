@@ -1,11 +1,11 @@
 gitlab_data:
     build:
-        path: data/gitlab
+        path: {{DOCKER_REPO}}/data/gitlab
         tag: data/gitlab
 
 gitlab_ce:
     build:
-        path: services/gitlab
+        path: {{DOCKER_REPO}}/services/gitlab
         tag: mdrohmann/gitlab-ce:7.10.1
     startup:
         port_bindings: {80: 8889, 22: 2222}
