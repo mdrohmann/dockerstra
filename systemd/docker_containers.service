@@ -1,7 +1,7 @@
 [Unit]
-Description=Main docker containers that should be started at every boot
+Description=Development servers that should be started on every boot
 Documentation=gitolite_local:docker/
-After=network.target docker.service home-martin.mount
+After=network.target docker.service home-martin.mount nginx_container.service
 Wants=docker.service
 
 [Service]
@@ -9,7 +9,7 @@ Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/home/martin/gistin/docker/systemd/configfiles
 ExecStart=/usr/bin/python /usr/local/bin/docker_start.py -e juergen_environment.yaml dev_servers_startup.yaml
-ExecStop=/usr/bin/python /usr/local/bin/docker_start.py --stop-all -e juergen_environment.yaml dev_servers_startup.yaml
+ExecStop=/usr/bin/python /usr/local/bin/docker_start.py -e juergen_environment.yaml dev_servers_stop.yaml
 
 [Install]
 WantedBy=mutli-user.target

@@ -1,3 +1,4 @@
+import: ["nginx_server.yaml"]
 git_repos:
     build:
         path: {{DOCKER_REPO}}/data/repositories
@@ -86,3 +87,21 @@ apt-cacher-ng:
 -
   pypicloud:
       command: start
+-
+  host:
+      command: execute
+      run:
+        - /usr/bin/python
+        - {{DOCKER_REPO}}/systemd/scripts/nginx-gen.py
+        - -o
+        - {{DOCKER_REPO}}/services/nginx/etc
+        - cgit
+        - gitolite
+        - pypicloud
+-
+  nginx:
+      command: start
+      restart: True
+      timeout: 0
+
+# vim: set sw=4 et:
