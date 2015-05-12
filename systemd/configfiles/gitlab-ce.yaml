@@ -1,0 +1,20 @@
+gitlab_data:
+    build:
+        path: data/gitlab
+        tag: data/gitlab
+
+gitlab_ce:
+    build:
+        path: services/gitlab
+        tag: mdrohmann/gitlab-ce:7.10.1
+    startup:
+        port_bindings: {80: 8889, 22: 2222}
+        volumes_from: gitlab_data
+
+---
+-
+    gitlab_data:
+        command: create
+-
+    gitlab_ce:
+        command: start

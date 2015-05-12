@@ -18,10 +18,10 @@ gitolite:
         tag: mdrohmann/gitolite
     creation:
         name: gitolite
-        volumes_from: git_repos
         volumes: ["/home/git/.ssh"]
     startup:
-        port_bindings: {2022: 22}
+        volumes_from: git_repos
+        port_bindings: {22: 2022}
 
 cgit:
     build:
@@ -29,11 +29,11 @@ cgit:
         tag: mdrohmann/cgit
     creation:
         name: cgit
-        volumes_from: git_repos
     startup:
-        port_bindings: {12345: 80}
+        volumes_from: git_repos
+        port_bindings: {80: 12345}
         binds:
-            ${PWD}/etc:
+            ${CONFIG_DIR}/etc:
                 bind: '/data'
                 ro: False
 
@@ -43,10 +43,10 @@ pypicloud:
         tag: mdrohmann/pypicloud
     creation:
         name: pypicloud
-        volumes_from: data_pypi
     startup:
+        volumes_from: data_pypi
         binds:
-            ${PWD}/pypicloud:
+            ${CONFIG_DIR}/pypicloud:
                 bind: /etc/pypicloud
                 ro: False
         port_bindings: {3031: 3031}
@@ -72,7 +72,7 @@ apt-cacher-ng:
       command: create
 -
   data_pypi:
-      command: build
+      command: create
 -
   apt-cacher-ng:
       command: start

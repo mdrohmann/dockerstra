@@ -42,9 +42,6 @@ RUN chown -R git:git /home/git && \
 
 COPY ./init.sh /init
 
-# Add volume to repositories directory
-VOLUME /repositories
-
 RUN chmod +x /init
 CMD ["/init", "/usr/sbin/sshd", "-D"]
 

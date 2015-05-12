@@ -9,8 +9,7 @@ gulp.task('serve', ['sphinx'], function() {
         }
     });
 
-    gulp.watch('**/*.rst', ['sphinx']);
-    gulp.watch('.build/html/**/*.html', browserSync.reload);
+    gulp.watch('./**/*.rst', ['sphinx']);
 });
 
 gulp.task('sphinx', [], function() {
@@ -18,6 +17,7 @@ gulp.task('sphinx', [], function() {
     shelljs.exec('make html', function(code, output) {
         console.log('Exit code:', code);
         console.log('Program output:', output);
+        browserSync.reload();
     });
 });
 

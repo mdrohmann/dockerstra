@@ -1,0 +1,77 @@
+nginx_proxy:
+    build:
+        path: services/nginx-proxy
+        tag: mdrohmann/nginx-proxy
+    creation:
+        name: nginx_proxy
+    startup:
+        port_bindings:
+            80: 4321
+            443: 4443
+        binds:
+            /var/run/docker.sock:
+                bind: /tmp/docker.sock
+                ro: False
+            ${CONFIG_DIR}/certs:
+                bind: /etc/nginx/certs
+                ro: True
+cgit_proxied:
+    build:
+        path: services/cgit
+        tag: mdrohmann/cgit
+    creation:
+        name: cgit_proxied
+        environment:
+            VIRTUAL_HOST: cgit.main
+    startup:
+        volumes_from: git_repos
+        binds:
+            ${CONFIG_DIR}/etc:
+                bind: '/data'
+                ro: False
+cgit_proxied_ssl:
+    build:
+        path: services/cgit
+        tag: mdrohmann/cgit
+    creation:
+        name: ssl_cgit_proxied
+        environment:
+            VIRTUAL_HOST: ssl.cgit.main
+    startup:
+        volumes_from: git_repos
+        binds:
+            ${CONFIG_DIR}/etc:
+                bind: '/data'
+                ro: False
+ssl_cgit_proxied_ssl:
+    build:
+        path: services/cgit
+        tag: mdrohmann/cgit
+    creation:
+        name: ssl_cgit_proxied_ssl
+        environment:
+            VIRTUAL_HOST: ssl2.cgit.main
+            VIRTUAL_PROTO: https
+    startup:
+        volumes_from: git_repos
+        binds:
+            ${CONFIG_DIR}/etc:
+                bind: '/data'
+                ro: False
+---
+-
+    nginx_proxy:
+        command: start
+-
+    cgit_proxied:
+        command: start
+-
+    cgit_proxied_ssl:
+        command: start
+-
+    ssl_cgit_proxied_ssl:
+        command: start
+-
+    host:
+        command: execute
+        run: ['make', 'test']
