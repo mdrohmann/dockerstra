@@ -38,7 +38,8 @@ if has_twisted:
 
 
 def spawnProcess(
-        run_args, outhandler, errhandler=None, shell=True, twisted=False):
+        run_args, outhandler, errhandler=None, shell=True, cwd=None,
+        twisted=False):
     if twisted:
         if shell:
             run_args = ['/bin/bash', '-c'] + run_args
@@ -47,10 +48,9 @@ def spawnProcess(
             raise RuntimeError(
                 "Twisted is not installed.  Please install or use subprocess")
 
-        sp = SpawnProtocol(outhandler, errhandler, kill_reactor=True)
-        reactor.spawnProcess(sp, run_args[0], run_args)
-        reactor.run()
-        return sp.returncode
+        sp = SpawnProtocol(outhandler, errhandler, kill_reactor=False)
+        reactor.spawnProcess(sp, run_args[0], run_args, path=cwd)
+        return sp.deferred
     else:
         stderr = subprocess.PIPE
         if errhandler is None:
@@ -59,6 +59,7 @@ def spawnProcess(
         p = subprocess.Popen(
             run_args,
             stdout=subprocess.PIPE, stderr=stderr,
+            cwd=cwd,
             shell=shell)
         sel_list = [p.stdout]
         if errhandler:
@@ -74,11 +75,12 @@ def spawnProcess(
                         errhandler(line)
         # theoretically, we could have missed the final output...
         orest = p.stdout.read()
-        erest = p.stderr.read()
         if orest:
             outhandler(orest)
-        if erest:
-            outhandler(erest)
+        if errhandler:
+            erest = p.stderr.read()
+            if erest:
+                errhandler(erest)
         p.communicate()
 
         return p.returncode

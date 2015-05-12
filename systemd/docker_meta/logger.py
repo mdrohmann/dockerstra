@@ -31,10 +31,15 @@ class OutputFilter(logging.Filter):
                 except:
                     return False
                 record.msg = md.get('stream', '')
+
+            elif record.cmd == 'execute':
+                record.msg = record.msg.strip()
+
             elif record.cmd == 'create_container':
                 record.msg = 'Created image with Id {}'.format(msg['Id'])
                 if msg['Warnings']:
                     record.msg += '\n' + msg['Warnings']
+
             elif record.cmd == 'pull':
                 try:
                     md = json.loads(msg)

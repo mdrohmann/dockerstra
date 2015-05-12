@@ -1,36 +1,35 @@
+import OpenSSL
 import pytest
+from service_identity.exceptions import VerificationError
 from twisted.internet import reactor
-from twisted.web.client import Agent
-from twisted.web.http_headers import Headers
-from twisted.internet.ssl import CertificateOptions, PrivateCertificate
+from twisted.internet.ssl import PrivateCertificate
 from twisted.python.modules import getModule
+from twisted.web.client import Agent, BrowserLikePolicyForHTTPS
+from twisted.web.http_headers import Headers
 
 
-class WebClientContextFactory(CertificateOptions):
-
-    def __init__(self):
-        pem = (
-            getModule(__name__).filePath.parent()
-            .sibling('certs').child('ssl.cgit.main.pem').getContent())
-        pem = getModule(__name__).filePath.sibling('invalid.pem').getContent()
-        pc = PrivateCertificate.loadPEM(pem)
-        CertificateOptions.__init__(self, trustRoot=pc)
-
-    def getContext(self, hostname, port):
-        return CertificateOptions.getContext(self)
+sslcgit_trustRoot = (
+    getModule(__name__).filePath.parent().sibling('certs')
+    .child('ssl.cgit.main.pem').getContent()
+)
+invalid_trustRoot = (
+    getModule(__name__).filePath.sibling('invalid.pem').getContent()
+)
 
 
 @pytest.fixture
-def url(request):
+def url_trustRoot(request):
     return request.param
 
 
 @pytest.fixture
-def agent_call(url):
-    url, ssl = url
-    if ssl:
-        contextFactory = WebClientContextFactory()
-        agent = Agent(reactor, contextFactory)
+def agent_call(url_trustRoot):
+    url, trustRoot = url_trustRoot
+    if trustRoot:
+        customPolicy = BrowserLikePolicyForHTTPS(
+            PrivateCertificate.loadPEM(trustRoot)
+        )
+        agent = Agent(reactor, customPolicy)
     else:
         agent = Agent(reactor)
 
@@ -42,43 +41,55 @@ def agent_call(url):
     return d
 
 
-def expect_header(version, code, sts=False):
+# TODO: add a test, where the authentication fails...
+@pytest.mark.parametrize(
+    'url_trustRoot, expected_header, expect_reject',
+    [(('http://cgit.main', None),
+      (('HTTP', 1, 1), 200, False), None),
+     (('https://ssl.cgit.main', sslcgit_trustRoot),
+      (('HTTP', 1, 1), 200, True), None),
+     (('https://ssl.cgit.main', invalid_trustRoot),
+      (('HTTP', 1, 1), 200, True), OpenSSL.SSL.Error),
+     (('http://ssl.cgit.main', None),
+      (('HTTP', 1, 1), 301, False), None),
+     (('https://cgit.main', sslcgit_trustRoot),
+      (('HTTP', 1, 1), 200, True), VerificationError),
+     (('https://ssl2.cgit.main', sslcgit_trustRoot),
+      (('HTTP', 1, 1), 200, True), VerificationError),
+     ],
+    ids=[
+        'http://cgit.main',
+        'https://ssl.cgit.main',
+        'https://ssl.cgit.main[invalid]',
+        'http://ssl.cgit.main',
+        'https://cgit.main',
+        'https://ssl2.cgit.main'
+    ])
+def test_header_responses(
+        agent_call, url_trustRoot, expected_header, expect_reject):
+
+    url, trustRoot = url_trustRoot
+    version, code, sts = expected_header
+
+    def error(failure):
+        if expect_reject:
+            assert type(failure.value.reasons[0].value) == expect_reject
+        else:
+            assert False, "No rejection expected"
 
     def header_expectations(response):
         assert response.version == version
         assert response.code == code
         sts_header = response.headers.getRawHeaders(
             'strict-transport-security')
-        if sts:
+        if trustRoot:
             assert sts_header
         else:
-            assert not sts_header
+            assert sts_header is None
+        return response
 
-    return header_expectations
+    agent_call.addCallbacks(header_expectations, error)
 
-
-def error(failure):
-    import pudb; pudb.set_trace()
-    print failure
-    assert False
-
-
-# TODO: add a test, where the authentication fails...
-@pytest.mark.parametrize(
-    'url, expected_header',
-    [(('http://cgit.main', False),
-      expect_header(('HTTP', 1, 1), 200, sts=False)),
-     (('https://ssl.cgit.main', True),
-      expect_header(('HTTP', 1, 1), 200, sts=True)),
-     (('http://ssl.cgit.main', True),
-      expect_header(('HTTP', 1, 1), 301, sts=False)),
-     (('https://cgit.main', True),
-      expect_header(('HTTP', 1, 1), 200, sts=True)),
-     (('https://ssl2.cgit.main', True),
-      expect_header(('HTTP', 1, 1), 200, sts=True)),
-     ])
-def test_header_responses(agent_call, url, expected_header):
-    agent_call.addCallbacks(expected_header, error)
     return agent_call
 
 

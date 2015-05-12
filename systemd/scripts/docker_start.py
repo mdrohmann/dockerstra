@@ -21,6 +21,9 @@ def create_parser():
         '-v', '--verbose', action='count',
         help='verbosity level')
     parser.add_argument(
+        '-e', '--environment', type=str,
+        help='Filename of YAML file with environment variables')
+    parser.add_argument(
         '-d', '--debug', action='store_true',
         help='Output debug information')
     parser.add_argument(
@@ -56,8 +59,11 @@ if __name__ == "__main__":
     dc = docker.Client(args.daemon)
 
     try:
-        configurations, order_list = read_configuration(args.configfile)
-        run_configuration(configurations, order_list, dc, args.stop_all)
+        configurations, order_list, config_dir = read_configuration(
+            args.configfile, args.environment)
+
+        run_configuration(
+            configurations, order_list, config_dir, dc, args.stop_all)
     except:
         log.error("Failed to execute the recipe.", exc_info=1)
 

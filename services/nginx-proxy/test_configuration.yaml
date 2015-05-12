@@ -73,4 +73,5 @@ ssl_cgit_proxied_ssl:
         command: start
 -
     host:
-        command: py.test --twisted tests/
+        command: execute
+        run: ['make', 'test']
