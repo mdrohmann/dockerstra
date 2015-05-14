@@ -16,6 +16,8 @@ Contents:
 
    docker_meta/docs/index
 
+   docker_meta/docker_meta/etc/hosts/README
+
 
 Indices and tables
 ==================

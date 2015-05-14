@@ -1,0 +1,7 @@
+import: python_host.yaml
+---
+-
+    virtualenv_{{VIRTUALENV}}:
+        command: restore
+        restore_dir: "{{BACKUP_DIR}}"
+        restore_name: python_{{VIRTUALENV}}

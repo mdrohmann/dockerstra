@@ -1,0 +1,29 @@
+# creates a minimal virtualenv environment in which python code can be executed
+import: python_host.yaml
+python_host_{{VIRTUALENV}}:
+    build:
+        path: {{DOCKER_REPO}}/services/python_hosts/{{VIRTUALENV}}
+        tag: mdrohmann/python_host_{{VIRTUALENV}}
+    creation:
+        tty: True
+        stdin_open: True
+        detach: False
+        entrypoint: ["/bin/bash"]
+    startup:
+        volumes_from:
+            virtualenv_{{VIRTUALENV}}
+        binds:
+            {{PYTHON_HOSTS}}/{{VIRTUALENV}}:
+                bind: /data
+                ro: False
+        links:
+            pypicloud: pypi-internal.main
+---
+-
+    virtualenv_{{VIRTUALENV}}:
+        command: create
+-
+    python_host_{{VIRTUALENV}}:
+        command: start
+
+# vim:set et sw=4 et:

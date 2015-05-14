@@ -1,0 +1,23 @@
+if [ -f /data/PYTHON_EXE ]; then
+  PYTHON_EXE=$(cat /data/PYTHON_EXE)
+else
+  PYTHON_EXE=python2.7
+fi
+
+if [ -f /virtualenv/bin/activate ]; then
+  source /virtualenv/bin/activate
+fi
+
+if [ -f /data/pip.conf ] && ! [ -L $HOME/.pip/pip.conf ]; then
+  rm -f $HOME/.pip/pip.conf
+  mkdir $HOME/.pip
+  ln -sf /data/pip.conf $HOME/.pip/pip.conf
+fi
+
+if [ -f /data/.pypirc ] && ! [ -L $HOME/.pypirc ]; then
+  rm -f $HOME/.pypirc
+  ln -sf /data/pypirc $HOME/.pypirc
+fi
+
+export LANG=en_US.UTF8
+export LC_ALL=en_US.UTF8

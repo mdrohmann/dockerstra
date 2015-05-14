@@ -1,0 +1,7 @@
+import: python_host.yaml
+---
+- virtualenv_{{VIRTUALENV}}:
+    command: backup
+    backup_dir: "{{BACKUP_DIR}}"
+    backup_name: python_{{VIRTUALENV}}
+    source: /virtualenv

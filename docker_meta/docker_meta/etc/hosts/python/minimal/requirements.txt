@@ -1,0 +1,9 @@
+pip
+pudb
+ipython
+ptpython
+pytest
+certifi
+pyopenssl
+pyasn1
+ndg-httpsclient
