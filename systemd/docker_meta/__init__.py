@@ -30,6 +30,8 @@ def environment_substutions(fh, buf, environment={}):
             value = environment.get(key, os.getenv(key))
             if value:
                 s = s[:res.start()] + value + s[res.end():]
+                log.debug(
+                    "subsituting {} with {}:\n{}".format(key, value, s))
         buf.write(s)
 
     buf.seek(0)
@@ -61,7 +63,8 @@ def read_configuration(configfile, environment={}):
 
         for importfile in importfiles:
             parent_file = os.path.join(configdir, importfile)
-            tmp_imported, _, _ = read_configuration(parent_file)
+            tmp_imported, _, _ = read_configuration(
+                parent_file, environment)
             imported.update(tmp_imported)
 
         imported.update(configurations)
