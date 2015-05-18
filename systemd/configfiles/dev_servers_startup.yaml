@@ -92,21 +92,12 @@ apt-cacher-ng:
       command: execute
       run:
         - /usr/bin/python
-        - {{DOCKER_REPO}}/systemd/scripts/nginx_gen.py
+        - {{DOCKER_REPO}}/systemd/scripts/nginx-gen.py
         - -o
         - {{DOCKER_REPO}}/services/nginx/etc
         - cgit
         - gitolite
         - pypicloud
--
-  host:
-      command: execute
-      run:
-          - /usr/bin/python
-          - {{DOCKER_REPO}}/systemd/scripts/hosts_gen.py
-          - -c
-          - {{DOCKER_REPO}}/systemd/configfiles/host_scenarios.yaml
-          - dev_servers
 -
   nginx:
       command: start
