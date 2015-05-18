@@ -46,11 +46,11 @@ def test_spawn(twisted, out_err_handlers):
     def internal(ret):
         assert ret == 0
         assert [o[0] for o in outlist] == ['hi\n', 'welt\n', 'bar\n']
-        assert outlist[1][1] > 0.09 and outlist[1][1] < 0.11
-        assert outlist[2][1] > 0.19 and outlist[2][1] < 0.21
+        assert outlist[1][1] > 0.09 and outlist[1][1] < 0.13
+        assert outlist[2][1] > 0.19 and outlist[2][1] < 0.23
         if errhandler:
             assert [o[0] for o in errlist] == ['foo\n']
-            assert errlist[0][1] > 0.09 and errlist[0][1] < 0.11
+            assert errlist[0][1] > 0.09 and errlist[0][1] < 0.13
         else:
             assert len(errlist) == 0
 
