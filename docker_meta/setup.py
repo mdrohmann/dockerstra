@@ -31,6 +31,14 @@ setup(
     author_email='mcd@askthevotegoat.com',
     scripts=['scripts/docker_start.py'],
     version='1.2',
+    package_data={
+        'docker_meta': [
+            'etc/environments/*',
+            'etc/config/*.yaml',
+            'etc/data/README.rst',
+            'etc/data/*',
+            'etc/services/*',
+            ]},
     install_requires=['docker-py', 'pyyaml'],
     license='LICENSE',
     packages=find_packages(),
