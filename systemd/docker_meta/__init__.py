@@ -22,16 +22,30 @@ __version__ = get_distribution(__name__).version
 log = logging.getLogger(__name__)
 
 
+def _substitute_line(pattern, s, environment):
+    substituted = False
+    for res in reversed(list(pattern.finditer(s))):
+        key = res.group()[2:-2].strip()
+        value = os.getenv(key, environment.get(key))
+        if value:
+            substituted = True
+            s = s[:res.start()] + value + s[res.end():]
+            log.debug(
+                "substituting {} with {}:\n{}".format(key, value, s))
+        else:
+            log.warn(
+                "Could not find a substitution for {}:\n{}".format(key, s))
+
+    if substituted:
+        s = _substitute_line(pattern, s, environment)
+
+    return s
+
+
 def environment_substutions(fh, buf, environment={}):
     pattern = re.compile(r'({{[^}]*}})')
     for s in fh.readlines():
-        for res in reversed(list(pattern.finditer(s))):
-            key = res.group()[2:-2].strip()
-            value = environment.get(key, os.getenv(key))
-            if value:
-                s = s[:res.start()] + value + s[res.end():]
-                log.debug(
-                    "subsituting {} with {}:\n{}".format(key, value, s))
+        s = _substitute_line(pattern, s, environment)
         buf.write(s)
 
     buf.seek(0)

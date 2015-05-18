@@ -369,8 +369,9 @@ def test_environment_substitution(tmpdir):
     envyaml = tmpdir.join('env.yaml')
     abc_value = 'hello world'
     envyaml.write("""
+THE_COMMAND: start
 BASEDIR: """ + str(tmpdir) + """
-COMMAND: start
+COMMAND: '{{THE_COMMAND}}'
 abc: """ + abc_value)
 
     testyaml.write("""
