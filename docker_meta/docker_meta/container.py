@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 import logging
 import os
-import time
 import re
+import time
+
 import docker
+import yaml
+
 import docker_meta.utils_spawn
-import docker_meta.utils
-from docker_meta.configurations import read_configuration
+from docker_meta.configurations import read_configuration, Configuration
 
 
 log = logging.getLogger(docker_meta.__name__)
@@ -21,8 +23,19 @@ def main(args):
     dc = get_docker_client(args.daemon)
 
     try:
+        config = Configuration(args.configdir)
+        if not config.initialized:
+            config.initialize()
+
+        environment = config.get_environment()
+
+        if args.environment:
+            with open(args.environment, 'r') as fh:
+                new_env = yaml.load(fh)
+                environment.update(new_env)
+
         configurations, order_list, config_dir = read_configuration(
-            args.configfile, args.environment)
+            args.unitcommand, environment)
 
         run_configuration(
             configurations, order_list, config_dir, dc, args.stop_all)

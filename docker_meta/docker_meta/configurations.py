@@ -11,12 +11,17 @@ import yaml
 from jinja2 import Environment, PackageLoader
 from pkg_resources import get_provider, resource_stream
 
-import docker_meta
+from docker_meta import __name__ as docker_meta_name
 from docker_meta import __version__ as docker_meta_version
 from docker_meta.utils import deepupdate
 
 
-log = logging.getLogger(docker_meta.__name__)
+log = logging.getLogger(docker_meta_name)
+
+
+def unitListCompleter(prefix, parsed_args, **kwargs):
+    c = Configuration(parsed_args.configdir)
+    return [s for s in c.list_units() if s.startswith(prefix)]
 
 
 def create_parser():
@@ -56,7 +61,7 @@ def create_parser():
         help='socket for daemon connection')
     run_group.add_argument(
         'unitcommand', metavar="UNIT/COMMAND",
-        help='The unit command to run')
+        help='The unit command to run').completer = unitListCompleter
     run_group.add_argument(
         '--print-only', action='store_true',
         help='Print the parsed unit command file to stdout.')
@@ -68,11 +73,6 @@ def create_parser():
         '--list-services', action='store_true',
         help='List available service files')
     return parser
-
-
-def unitListCompleter(prefix, parsed_args, **kwargs):
-    c = Configuration(parsed_args.configdir)
-    return c.list_units()
 
 
 def _substitute_line(pattern, s, environment):
@@ -140,9 +140,6 @@ def read_configuration(configfile, environment={}):
     return configurations, order_list, configdir
 
 
-log = logging.getLogger(docker_meta.__name__)
-
-
 def silent_mkdirs(dirs):
     try:
         os.makedirs(dirs)
@@ -172,7 +169,7 @@ class Configuration(object):
         self.basedir = self._guess_basedir(basedir)
         log.debug('Using configuration directory {}'.format(self.basedir))
         self.initialized = self._isinitialized()
-        provider = get_provider(docker_meta.__name__)
+        provider = get_provider(docker_meta_name)
         self.provider = provider
 
     def _isinitialized(self, basedir=None):
@@ -194,7 +191,7 @@ class Configuration(object):
                 else:
                     with open(rfullname, 'w') as fh:
                         instream = resource_stream(
-                            docker_meta.__name__, fullname)
+                            docker_meta_name, fullname)
                         fh.write(instream.read())
 
         _walk(path, rpath)
@@ -203,7 +200,7 @@ class Configuration(object):
 
         env = Environment(
             loader=PackageLoader(
-                docker_meta.__name__,
+                docker_meta_name,
                 package_path='jinja'))
         render_opts = {'home': os.getenv('HOME')}
 
