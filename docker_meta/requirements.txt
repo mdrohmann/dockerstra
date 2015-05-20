@@ -1,2 +1,6 @@
+argcomplete
+distribute
 docker-py
+jinja2
+setuptools
 pyyaml
