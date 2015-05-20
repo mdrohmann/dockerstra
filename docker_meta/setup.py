@@ -40,7 +40,8 @@ setup(
             ] + recursive_walk('docker_meta/etc')
         },
     install_requires=[
-        'docker-py', 'pyyaml', 'jinja2', 'setuptools', 'distribute'],
+        'docker-py', 'pyyaml', 'jinja2', 'setuptools', 'distribute',
+        'argcomplete'],
     license='LICENSE',
     packages=find_packages(),
     cmdclass={'test': PyTest},

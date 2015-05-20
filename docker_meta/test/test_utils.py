@@ -2,7 +2,7 @@ import time
 
 import pytest
 
-from docker_meta import utils
+from docker_meta import utils, utils_spawn
 
 
 def test_deepupdate():
@@ -52,14 +52,14 @@ def out_err_handlers(request):
 @pytest.mark.parametrize(
     'twisted', [
         False,
-        pytest.mark.skipif('not utils.has_twisted', True),
+        pytest.mark.skipif('not utils_spawn.has_twisted', True),
     ],
     ids=['subprocess', 'twisted'])
 def test_spawn(twisted, out_err_handlers):
 
     outlist, errlist, outhandler, errhandler = out_err_handlers
 
-    ret = utils.spawnProcess(
+    ret = utils_spawn.spawnProcess(
         ['echo hi; sleep 0.1; echo welt; echo foo 1>&2;'
          'sleep 0.1; echo bar;'],
         outhandler, errhandler, shell=True, twisted=twisted)

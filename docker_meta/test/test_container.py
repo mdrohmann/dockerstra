@@ -7,9 +7,9 @@ from io import BytesIO
 import docker
 import pytest
 
+from docker_meta.configurations import (read_configuration)
+from docker_meta.container import (DockerContainer, run_configuration)
 import docker_meta
-from docker_meta import (
-    DockerContainer, run_configuration, read_configuration)
 from docker_meta.logger import (
     configure_logger, last_info_line, last_error_line)
 

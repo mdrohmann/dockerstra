@@ -3,8 +3,7 @@ import sys
 
 import pytest
 
-import docker_meta
-from docker_meta import DockerContainer
+import docker_meta.container
 from docker_meta.logger import (
     _get_logger_configuration, configure_logger,
     last_info_line, last_error_line, info_lines, error_lines)
@@ -74,7 +73,7 @@ def test_log_configuration():
     ], ids=['verbose={}'.format(i) for i in range(4)])
 def test_output_filter_pull(v, expected):
     configure_logger(test=True, verbosity=v)
-    dc = DockerContainer(None, 'test')
+    dc = docker_meta.container.DockerContainer(None, 'test')
     dc._log_output('', 'pull')
     # ignore lines without status
     dc._log_output('{"id": "ab", "progressDetail": 21}', 'pull')
@@ -102,7 +101,7 @@ def test_output_filter_pull(v, expected):
     ], ids=['verbose={}'.format(i) for i in range(4)])
 def test_output_filter_build_image(v, expected):
     configure_logger(test=True, verbosity=v)
-    dc = DockerContainer(None, 'test')
+    dc = docker_meta.container.DockerContainer(None, 'test')
     dc._log_output('', 'build')
     dc._log_output('{"stream": "hello"}', 'build')
     dc._log_output('{"stream": "world"}', 'build')
@@ -123,7 +122,7 @@ def test_output_filter_build_image(v, expected):
     ], ids=['verbose={}'.format(i) for i in range(4)])
 def test_output_filter_create_container(v, expected):
     configure_logger(test=True, verbosity=v)
-    dc = DockerContainer(None, 'test')
+    dc = docker_meta.container.DockerContainer(None, 'test')
     dc._log_output('', 'create_container')
     dc._log_output(
         {'Id': 'abc', 'Warnings': None}, 'create_container')
