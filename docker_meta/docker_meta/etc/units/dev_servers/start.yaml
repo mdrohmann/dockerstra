@@ -1,21 +1,21 @@
 import: ["nginx_server.yaml"]
 git_repos:
     build:
-        path: {{DOCKER_REPO}}/data/repositories
+        path: data/repositories
         tag: data/repositories
     creation:
         name: git_repos
 
 data_pypi:
     build:
-        path: {{DOCKER_REPO}}/data/pypicloud
+        path: data/pypicloud
         tag: data/pypicloud
     creation:
         name: pypi_data
 
 gitolite:
     build:
-        path: {{DOCKER_REPO}}/services/gitolite
+        path: services/gitolite
         tag: mdrohmann/gitolite
     creation:
         name: gitolite
@@ -26,7 +26,7 @@ gitolite:
 
 cgit:
     build:
-        path: {{DOCKER_REPO}}/services/cgit
+        path: services/cgit
         tag: mdrohmann/cgit
     creation:
         name: cgit
@@ -40,7 +40,7 @@ cgit:
 
 pypicloud:
     build:
-        path: {{DOCKER_REPO}}/services/pypicloud
+        path: services/pypicloud
         tag: mdrohmann/pypicloud
     creation:
         name: pypicloud
@@ -54,7 +54,7 @@ pypicloud:
 
 apt-cacher-ng:
     build:
-        path: {{DOCKER_REPO}}/services/apt-cacher-ng
+        path: services/apt-cacher-ng
         tag: mdrohmann/apt-cacher-ng
     creation:
         name: apt-cacher-ng
@@ -92,9 +92,9 @@ apt-cacher-ng:
       command: execute
       run:
         - /usr/bin/python
-        - {{DOCKER_REPO}}/systemd/scripts/nginx-gen.py
+        - nginx-gen.py
         - -o
-        - {{DOCKER_REPO}}/services/nginx/etc
+        - {{DOCKERCONF}}/services/nginx/etc
         - cgit
         - gitolite
         - pypicloud

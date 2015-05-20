@@ -1,4 +1,4 @@
-import: dev_servers_startup.yaml
+import: start.yaml
 ---
 -
   apt-cacher-ng:
@@ -17,10 +17,10 @@ import: dev_servers_startup.yaml
       command: execute
       run:
         - /usr/bin/python
-        - {{DOCKER_REPO}}/systemd/scripts/nginx-gen.py
+        - nginx-gen.py
         - --remove
         - -o
-        - {{DOCKER_REPO}}/services/nginx/etc
+        - {{DOCKERCONF}}/services/nginx/etc
         - cgit
         - gitolite
         - pypicloud

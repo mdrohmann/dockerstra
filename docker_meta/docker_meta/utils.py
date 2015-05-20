@@ -1,3 +1,4 @@
+import collections
 import os
 try:
     from twisted.internet import protocol, reactor, defer
@@ -10,6 +11,16 @@ try:
 except:
     import subprocess
 import select
+
+
+def deepupdate(d, u):
+    for k, v in u.iteritems():
+        if isinstance(v, collections.Mapping):
+            r = deepupdate(d.get(k, {}), v)
+            d[k] = r
+        else:
+            d[k] = u[k]
+    return d
 
 
 def recursive_walk(path):

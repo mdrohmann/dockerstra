@@ -5,6 +5,14 @@ import pytest
 from docker_meta import utils
 
 
+def test_deepupdate():
+    init = {'a': {'b': 1}}
+    update = {'a': {'c': 2}}
+    expect = {'a': {'b': 1, 'c': 2}}
+
+    assert utils.deepupdate(init, update) == expect
+
+
 def test_recursive_walk(tmpdir):
 
     tmpdir.chdir()

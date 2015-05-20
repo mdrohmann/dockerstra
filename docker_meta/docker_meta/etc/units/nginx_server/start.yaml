@@ -1,6 +1,6 @@
 nginx:
     build:
-        path: {{DOCKER_REPO}}/services/nginx
+        path: services/nginx
         tag: mdrohmann/nginx
     startup:
         binds:

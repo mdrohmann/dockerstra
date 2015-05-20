@@ -1,8 +1,8 @@
-import: selenium.yaml
+import: start.yaml
 ---
 -
   selenium_hub:
       command: start
 -
-  chrome_node:
+  firefox_node:
       command: start
