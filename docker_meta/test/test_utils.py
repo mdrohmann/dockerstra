@@ -5,6 +5,19 @@ import pytest
 from docker_meta import utils
 
 
+def test_recursive_walk(tmpdir):
+
+    tmpdir.chdir()
+    tmpdir.ensure('f1')
+    tmpdir.join('s1').ensure('f2')
+    tmpdir.join('s2').ensure('f3')
+    tmpdir.join('s1').join('s3').ensure('f4')
+
+    res = utils.recursive_walk('.')
+    assert set(res) == set([
+        'f1', 's1/f2', 's2/f3', 's1/s3/f4'])
+
+
 @pytest.fixture(
     params=['with_err', 'without_err'])
 def out_err_handlers(request):

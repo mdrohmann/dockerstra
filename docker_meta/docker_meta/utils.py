@@ -1,3 +1,4 @@
+import os
 try:
     from twisted.internet import protocol, reactor, defer
     has_twisted = True
@@ -9,6 +10,15 @@ try:
 except:
     import subprocess
 import select
+
+
+def recursive_walk(path):
+    res = []
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            res.append(os.path.relpath(os.path.join(root, file)))
+
+    return res
 
 
 if has_twisted:

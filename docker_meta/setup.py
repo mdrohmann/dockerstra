@@ -5,13 +5,15 @@ import sys
 from setuptools import setup, find_packages
 from setuptools.command.test import test as TestCommand
 
+from docker_meta.utils import recursive_walk
+
 
 class PyTest(TestCommand):
     user_options = [('pytest-args=', 'a', "Arguments to pass to py.test")]
 
     def initialize_options(self):
         TestCommand.initialize_options(self)
-        self.pytest_args = []
+        self.pytest_args = ['--twisted']
 
     def finalize_options(self):
         TestCommand.finalize_options(self)
@@ -31,14 +33,12 @@ setup(
     author_email='mcd@askthevotegoat.com',
     scripts=['scripts/docker_start.py'],
     version='1.2',
+    zip_safe=True,
     package_data={
         'docker_meta': [
-            'etc/environments/*',
-            'etc/config/*.yaml',
-            'etc/data/README.rst',
-            'etc/data/*',
-            'etc/services/*',
-            ]},
+            'jinja/environments/*',
+            ] + recursive_walk('docker_meta/etc')
+        },
     install_requires=['docker-py', 'pyyaml'],
     license='LICENSE',
     packages=find_packages(),

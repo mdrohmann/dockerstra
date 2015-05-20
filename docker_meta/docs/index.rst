@@ -10,7 +10,7 @@ arbitrary commands on those data containers.  New commands can be added easily.
 Installation
 ------------
 
-Install the tool with
+Install the tool with pip
 
 ::
 
