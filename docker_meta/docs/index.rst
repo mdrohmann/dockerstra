@@ -28,11 +28,60 @@ The verbosity of the output can be controlled with the flags ``verbose`` and
 automatic changes of the configuration.  Increasing the verbosity, creates more
 information about the output of the docker-py_ commands.
 
-YAML configuration files
-````````````````````````
+By default, the configuration files for ``docker_start`` situate in one of
+these places referred to as ``$DOCKERSTRA_CONF``:
 
-The configuration file is in the YAML_ format, and consists of two
-documents (separated with a line containing the separation marker (``---``).
+- ``$HOME/.dockerstra``
+- ``PYTHON_INSTALL_DIR/etc/dockerstra``
+- ``/etc/dockerstra``
+
+Select a configuration directory explicitly with the option ``-c``.
+
+The directory ``$DOCKERSTRA_CONF`` has the following subdirectories that will
+be described in detail:
+
+- :ref:`environments<environments>`
+- :ref:`services<services>`
+- :ref:`data<services>`
+- :ref:`units<units>`
+
+.. _units:
+
+Unit files
+``````````
+
+Units are the most important entity in the |project| world.  They define, how
+collection of docker containers are created, started, stopped and interact with
+each other.  A unit is denoted by the tuple ``UNITNAME/COMMAND`` referring to
+its unique *unit name* and a *command*.  Each *command* is either defined by a
+configuration file, or exist magically:
+If the *command* ``start`` exists, that should describe how to start up the
+unit, the commands
+
+- ``stop`` (stops all the containers in the unit)
+- ``cleanup`` (removes all containers, that do not have a volume attached) and
+- ``purge`` (removes all containers, deletes volumes and removes base images).
+
+are generated automatically, but can be overwritten with explicit command files.
+
+To list all available units, the command
+
+.. code:: bash
+
+   docker_start --list-units
+
+returns a list of all available ``UNITNAME/COMMAND`` tuples.
+
+In order to print out the (potentially automatically created) configuration
+file for a unit command, type
+
+.. code:: bash
+
+   docker_start --print-unit UNITNAME/COMMAND
+
+Like all configuration files in |project|, the unit command files written in
+the YAML_ format, and consists of two documents (separated with a line
+containing the separation marker (``---``).
 
 .. _composition:
 
@@ -171,6 +220,30 @@ remove
     timeout
       time to wait before the container is stopped.  (*Default*: ``10``)
 
+execute
+  executes a command either on the file system of the host container or in the
+  special container named ``host`` that is only valid for this command.
+
+  **Arguments**:
+    run
+      a command list to execute
+    shell
+      whether to execute it in a shell
+    binds
+      a dictionary of volume binds for the host system
+
+
+.. _environments:
+
+Environment files
+`````````````````
+
+Environment files 
+
+.. _services:
+
+Service and data directories
+````````````````````````````
 
 .. _YAML: http://yaml.org
 .. _docker-py: http://docker-py.readthedocs.org

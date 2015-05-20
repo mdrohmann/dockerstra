@@ -7,13 +7,10 @@ from docker_meta.logger import (
     configure_logger, last_info_line)
 
 
-configure_logger(test=True, verbosity=1, debug=1)
-
-
 def test_basedir(tmpdir, monkeypatch):
     basedirs = [
         (str(tmpdir.join('unwritable')), 'etc'),
-        (str(tmpdir.join('valid')), 'etc')
+        (str(tmpdir.join('valid')), 'etc'),
         ]
 
     monkeypatch.setattr(Configuration, 'valid_basedirs', basedirs)
@@ -35,9 +32,18 @@ def test_basedir(tmpdir, monkeypatch):
     config3 = Configuration(basedirs[1][0])
     assert config3.basedir == basedirs[1][0]
 
+    toskipdir = tmpdir.join('toskip').ensure_dir()
+    basedirs.insert(0, (str(toskipdir), 'etc'))
+
+    config1.initialize()
+    config4 = Configuration()
+    assert config4.basedir == config1.basedir
+
 
 @pytest.fixture
 def test_init(tmpdir):
+    configure_logger(test=True, verbosity=1, debug=1)
+
     etcdir = tmpdir.join('etc').ensure_dir()
     c = Configuration(str(etcdir))
     assert not c.initialized

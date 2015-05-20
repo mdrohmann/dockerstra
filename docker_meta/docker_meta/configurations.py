@@ -47,8 +47,10 @@ class Configuration(object):
         provider = get_provider(docker_meta.__name__)
         self.provider = provider
 
-    def _isinitialized(self):
-        return os.path.exists(os.path.join(self.basedir, 'environments'))
+    def _isinitialized(self, basedir=None):
+        if basedir is None:
+            basedir = self.basedir
+        return os.path.exists(os.path.join(basedir, 'environments'))
 
     def _initialize_etc(self):
         path = 'etc'
@@ -104,6 +106,12 @@ class Configuration(object):
                     "write-able"
                     .format(basedir))
         else:
+            # first check if initialized configuration exists already!
+            for candidate, subdir in self.valid_basedirs:
+                basedir = os.path.join(candidate, subdir)
+                if self._isinitialized(basedir):
+                    return basedir
+            # if not, prepare the first write-able candidate for initialization
             for candidate, subdir in self.valid_basedirs:
                 if _iswritable(candidate):
                     basedir = os.path.join(candidate, subdir)
