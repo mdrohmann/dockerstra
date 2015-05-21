@@ -104,6 +104,52 @@ def environment_substutions(fh, buf, environment={}):
     buf.seek(0)
 
 
+def modify_order_list(configurations, order_list, command):
+    # return builds, creations and starts:
+
+    def _parse(order_list):
+        builds, creations, starts = [], [], []
+        for item in order_list:
+            name, order = item.items()[0]
+            cmd = order['command']
+            if cmd == 'start':
+                starts.append(name)
+            elif cmd == 'create':
+                starts.append(name)
+            elif cmd == 'build':
+                build_config = configurations['name'].get('build', {})
+                if build_config.get('tag'):
+                    starts.append(name)
+        return builds, creations, starts
+
+    builds, creations, starts = _parse(configurations, order_list)
+    new_order_list = []
+
+    stop_command = {'command': 'stop', 'timeout': 0}
+    if command == 'cleanup':
+        remove_order = {'command': 'remove', 'v': False}
+    elif command == 'purge':
+        remove_order = {'command': 'remove', 'v': True}
+
+    if command == 'restart':
+        for started in reversed(starts):
+            new_order_list.append(
+                {started: {'command': 'start', 'restart': True}})
+    if command in ['stop', 'cleanup', 'purge']:
+        for started in reversed(starts):
+            new_order_list.append({started: stop_command})
+    if command in ['cleanup', 'purge']:
+        for started in reversed(starts):
+            new_order_list.append({started: remove_order})
+        for created in reversed(creations):
+            new_order_list.append({created: remove_order})
+
+    if command == 'purge':
+        for built in reversed(builds):
+            new_order_list.append({built: {'command': 'remove_image'}})
+    return new_order_list
+
+
 def read_configuration(configfile, environment={}):
     if isinstance(environment, basestring):
         if environment:

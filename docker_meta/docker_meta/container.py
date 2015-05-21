@@ -8,7 +8,8 @@ import docker
 import yaml
 
 import docker_meta.utils_spawn
-from docker_meta.configurations import read_configuration, Configuration
+from docker_meta.configurations import (
+    read_configuration, Configuration, modify_order_list)
 
 
 log = logging.getLogger(docker_meta.__name__)
