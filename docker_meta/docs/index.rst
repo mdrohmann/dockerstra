@@ -220,6 +220,9 @@ remove
     timeout
       time to wait before the container is stopped.  (*Default*: ``10``)
 
+remove_image
+  removes the image associated with the container.
+
 execute
   executes a command either on the file system of the host container or in the
   special container named ``host`` that is only valid for this command.

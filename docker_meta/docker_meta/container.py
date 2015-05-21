@@ -380,6 +380,12 @@ class DockerContainer(object):
                 "Not stopping container {} as it was not running"
                 .format(self.name))
 
+    def remove_image(self):
+        image = self.get_image()
+        if image:
+            self.dc.remove_image(image)
+            log.info('Successfully removed the image {}.'.format(image))
+
     def remove(self, v=True, timeout=10):
         self.stop(timeout)
         container = self.get_container()
@@ -436,6 +442,8 @@ def run_configuration(
             container.backup(source_dir, backup_dir, backup_name, overwrite)
         elif cmd == 'stop':
             container.stop(timeout)
+        elif cmd == 'remove_image':
+            container.remove_image()
         elif cmd == 'remove':
             v = orders.pop('v', True)
             container.remove(v, timeout)
