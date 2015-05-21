@@ -216,9 +216,12 @@ remove
 
   **Arguments**:
     v
-      removes attached volumes with the container (*Default*: ``True``)
+      removes attached volumes with the container (*Default*: ``False``)
     timeout
       time to wait before the container is stopped.  (*Default*: ``10``)
+
+  If the ``v`` argument is unset, the container is **not** removed, if it has
+  volumes attached to it, that would otherwise be lost in the docker nirvana.
 
 remove_image
   removes the image associated with the container.

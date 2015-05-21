@@ -386,10 +386,27 @@ class DockerContainer(object):
             self.dc.remove_image(image)
             log.info('Successfully removed the image {}.'.format(image))
 
-    def remove(self, v=True, timeout=10):
+    def remove(self, v=False, timeout=10):
         self.stop(timeout)
         container = self.get_container()
         if container:
+            if not v:
+                inspect = self.dc.inspect_container(self.name)
+                binds = set([
+                    n.split(':')[1] for n in inspect['HostConfig']['Binds']])
+                volumes_from = inspect['HostConfig']['VolumesFrom']
+                fvolumes = []
+                for vf in volumes_from:
+                    finspect = self.dc.inspect_container(vf)
+                    fvolumes += finspect['Volumes'].keys()
+                volumes = set(inspect['Volumes'].keys())
+                if volumes.difference(binds.union(set(fvolumes))):
+                    log.info(
+                        "Not removing container {} as it has volumes attached "
+                        "to it."
+                        .format(self.name))
+                    return
+
             self.dc.remove_container(container, v)
             log.info("Successfully removed container {}".format(self.name))
         else:
@@ -445,7 +462,7 @@ def run_configuration(
         elif cmd == 'remove_image':
             container.remove_image()
         elif cmd == 'remove':
-            v = orders.pop('v', True)
+            v = orders.pop('v', False)
             container.remove(v, timeout)
         elif cmd == 'execute':
             shell = orders.pop('shell', False)
