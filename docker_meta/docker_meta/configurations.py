@@ -53,9 +53,6 @@ def create_parser():
         '-e', '--environment', type=str, default='',
         help='Filename of YAML file with environment variables')
     run_group.add_argument(
-        '-s', '--stop-all', action='store_true',
-        help='Stop all the processes that are touched by the configuration')
-    run_group.add_argument(
         '-H', '--daemon', metavar="DAEMON",
         default='unix://var/run/docker.sock',
         help='socket for daemon connection')

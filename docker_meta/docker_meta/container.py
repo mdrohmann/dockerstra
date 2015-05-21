@@ -487,13 +487,6 @@ def run_configuration(
         timeout = orders.pop('timeout', 10)
         wait_time = orders.pop('wait', 0)
 
-        if stop_all:
-            cmd = 'stop'
-            timeout = 0
-
-            if name == 'host':
-                continue
-
         log.info('Executing step {} on {}'.format(cmd, name))
         if cmd == 'build':
             container.build_image()
