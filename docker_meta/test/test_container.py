@@ -27,6 +27,10 @@ configure_logger(test=True, verbosity=1)
 log = logging.getLogger(docker_meta.__name__)
 
 
+def test_main():
+    pass
+
+
 class TestWithDockerDaemon(object):
     cli = None
     uid = None
@@ -159,8 +163,13 @@ class TestWithDockerDaemon(object):
         # delete container and it should work again afterwards...
 
         container.stop(timeout=0)
-        container.remove(v=True)
 
+        # container has attached volume, that needs to be removed... skipped
+        # with v==False
+        container.remove(v=False)
+        assert container.get_container()
+
+        container.remove(v=True)
         assert not container.get_container()
         container.start()
 
@@ -202,27 +211,13 @@ default_events = [
     ('execute', ['host', ['echo', 'hallo'], True, {}]), 0,
     ]
 
-stop_all_events = [
-    ('stop', ['x3', 0]), 12,
-    ('stop', ['x2', 0]), 0,
-    ('stop', ['x1', 0]), 0,
-    ('stop', ['x1', 0]), 0,
-    ('stop', ['x1', 0]), 0,
-    ('stop', ['x1', 0]), 0,
-    ('stop', ['x1', 0]), 0,
-    ('stop', ['x2', 0]), 0,
-    ('stop', ['x2', 0]), 0,
-    ('stop', ['x2', 0]), 0,
-    ]
-
 
 @pytest.mark.parametrize(
-    'stop_all, expected',
-    [(False, default_events),
-     (True, stop_all_events),
+    'expected',
+    [(default_events),
      ],
-    ids=['default', 'stop_all'])
-def test_container_configuration(monkeypatch, stop_all, expected):
+    ids=['default'])
+def test_container_configuration(monkeypatch, expected):
     events = []
     monkeypatch.setattr(time, 'sleep', lambda x: events.append(x))
 
@@ -291,7 +286,7 @@ def test_container_configuration(monkeypatch, stop_all, expected):
             }},
         ],
         '.',
-        None, stop_all=stop_all)
+        None)
 
     assert events == expected
 

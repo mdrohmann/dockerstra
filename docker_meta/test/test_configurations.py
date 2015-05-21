@@ -2,9 +2,27 @@
 
 import os
 import pytest
-from docker_meta.configurations import Configuration
+from docker_meta.configurations import (
+    Configuration, create_parser, modify_order_list)
 from docker_meta.logger import (
     configure_logger, last_info_line)
+
+
+@pytest.mark.parametrize('cmdline,expect', [
+    ('run -H 172.17.42.1:4243 --print-only unit/start', {
+        'subparser': 'run', 'daemon': '172.17.42.1:4243',
+        'print_only': True, 'unitcommand': 'unit/start'
+        }),
+    ('list --units', {
+        'subparser': 'list',
+        'units': True,
+        })])
+def test_parser(cmdline, expect):
+    parser = create_parser()
+    args = parser.parse_args(cmdline.split(' '))
+    for k, v in expect.iteritems():
+        assert hasattr(args, k)
+        assert getattr(args, k) == v
 
 
 def test_basedir(tmpdir, monkeypatch):
@@ -85,6 +103,27 @@ test: 12
     env = c.get_environment()
     assert set(env.keys()) == set(
         ['DOCKERSTRA_CONF', 'DOCKER_HOST', 'BACKUP_DIR', 'test'])
+
+
+@pytest.mark.parametrize('init,command,expected', [({
+    'x1_without_build': {'command': 'build'},
+    'x2_with_build': {'command': 'build'},
+    'x1_without_build': {'command': 'create'},
+    'x2_with_build': {'command': 'start'},
+    },
+    'stop', {
+        'x2_with_build': {'command': 'stop', 'timeout': 0},
+        }),
+    ])
+def test_modify_order_list(init, command, expected):
+
+    configurations = {
+        'x1_without_build': {},
+        'x2_with_build': {'build': {'tag': 'test'}},
+        'x3': {},
+        'x4': {}}
+
+    assert modify_order_list(configurations, init, command) == expected
 
 
 def test_list_units(test_init):
