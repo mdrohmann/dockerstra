@@ -18,27 +18,74 @@ def get_docker_client(daemon):
     return docker.Client(daemon)
 
 
-def main(args):
+def main_run(config, args):
 
     dc = get_docker_client(args.daemon)
+
+    environment = config.get_environment()
+
+    if args.environment:
+        with open(args.environment, 'r') as fh:
+            new_env = yaml.load(fh)
+            environment.update(new_env)
+
+    # transform the unitcommand to a configfile here
+    unit, command = args.unitcommand.rsplit('/', 1)
+    configfile = config.get_abspath(
+        os.path.join('units', unit, '{}.yaml'.format(command)))
+    if configfile:
+        configurations, order_list = read_configuration(
+            configfile, environment)
+    else:
+        configfile = config.get_abspath(
+            os.path.join('units', unit, 'start.yaml'))
+        if configfile:
+            configurations, order_list = read_configuration(
+                configfile, environment)
+            order_list = modify_order_list(order_list, command)
+
+    if args.print_only:
+        print yaml.safe_dump_all([configurations, order_list])
+    else:
+        run_configuration(
+            config, configurations, order_list, dc, args.unitcommand)
+
+
+def _list_out(print_titles, title, list):
+    if print_titles:
+        print(title)
+        print('=' * len(title))
+    print '\n'.join(list)
+    if print_titles:
+        print('')
+
+
+def main_list(config, args):
+    if not (args.units or args.services):
+        args.units = True
+
+    print_titles = False
+    if args.units and args.services:
+        print_titles = True
+
+    if args.units:
+        _list_out(print_titles, 'Available units:', config.list_units())
+    if args.services:
+        _list_out(print_titles, 'Available services:', config.list_services())
+
+
+def main(args):
 
     try:
         config = Configuration(args.configdir)
         if not config.initialized:
             config.initialize()
 
-        environment = config.get_environment()
+        if args.subparser == 'run':
+            main_run(config, args)
+        elif args.subparser == 'list':
+            main_list(config, args)
 
-        if args.environment:
-            with open(args.environment, 'r') as fh:
-                new_env = yaml.load(fh)
-                environment.update(new_env)
-
-        configurations, order_list, config_dir = read_configuration(
-            args.unitcommand, environment)
-
-        run_configuration(
-            configurations, order_list, config_dir, dc, args.stop_all)
     except:
         log.error("Failed to execute the recipe.", exc_info=1)
 
@@ -46,20 +93,26 @@ def main(args):
 class DockerContainer(object):
 
     def __init__(
-            self, dc, name, creation={}, startup={}, build={}, config_dir='.'):
+            self, dc, name, creation={}, startup={}, build={},
+            global_config=Configuration(), unitname='unknown/unknown'):
 
         self.dc = dc
+        self.unitname = unitname   # TODO: this has been added to the signature
         self.name = name
         self.creation = creation
         self.startup = startup
         self.build = build
-        self.config_dir = config_dir
+        self.global_config = global_config
         self._update_start_config()
         self._update_creation_config()
         log.debug("Initialized docker container {}".format(name))
 
-    def _configdir(self):
-        return os.path.abspath(self.build.get('path', self.config_dir))
+    def _buildpath(self):
+        buildpath = self.build.get('path')
+        if buildpath:
+            return self.global_config.get_abspath(buildpath)
+        else:
+            return os.getcwd()
 
     def _path_substitutions(self, fro):
         """
@@ -67,10 +120,9 @@ class DockerContainer(object):
 
         The only possible environment variable is ${CONFIG_DIR} at the moment.
         It is substituted with the containers build path.  If the build path is
-        not specified, the configuration file's directory is used.  If this has
-        not been specified either, our fall-back is the current directory.
+        not specified, our fall-back is the current directory.
         """
-        config_dir = self._configdir()
+        config_dir = self._buildpath()
 
         nfro = fro.replace('${CONFIG_DIR}', config_dir)
         if nfro != fro:
@@ -233,7 +285,7 @@ class DockerContainer(object):
 
         if self.name == 'host':
 
-            cwd = self._configdir()
+            cwd = self._buildpath()
             ret = docker_meta.utils_spawn.spawnProcess(
                 run_args,
                 outhandler=lambda data: self._log_output(data, 'execute'),
@@ -416,7 +468,8 @@ class DockerContainer(object):
 
 
 def run_configuration(
-        configurations, order_list, config_dir, dc, stop_all=False):
+        global_config, configurations, order_list, dc,
+        unitcommand='unknown/unknown'):
 
     for item in order_list:
 
@@ -427,7 +480,8 @@ def run_configuration(
                 "Could not find a configuration for container {}".format(name))
         cmd = orders['command']
 
-        container = DockerContainer(dc, name, config_dir=config_dir, **c)
+        container = DockerContainer(
+            dc, name, global_config=global_config, unitname=unitcommand, **c)
 
         timeout = orders.pop('timeout', 10)
         wait_time = orders.pop('wait', 0)

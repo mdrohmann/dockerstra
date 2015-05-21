@@ -67,10 +67,10 @@ def create_parser():
         help='Print the parsed unit command file to stdout.')
     list_group = subparsers.add_parser('list', help='list certain things')
     list_group.add_argument(
-        '--list-units', action='store_true',
+        '--units', action='store_true',
         help='List available unit files')
     list_group.add_argument(
-        '--list-services', action='store_true',
+        '--services', action='store_true',
         help='List available service files')
     return parser
 
@@ -130,14 +130,14 @@ def read_configuration(configfile, environment={}):
 
         for importfile in importfiles:
             parent_file = os.path.join(configdir, importfile)
-            tmp_imported, _, _ = read_configuration(
+            tmp_imported, _ = read_configuration(
                 parent_file, environment)
             imported.update(tmp_imported)
 
         imported.update(configurations)
         configurations = imported
 
-    return configurations, order_list, configdir
+    return configurations, order_list
 
 
 def silent_mkdirs(dirs):

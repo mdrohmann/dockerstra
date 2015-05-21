@@ -68,7 +68,7 @@ To list all available units, the command
 
 .. code:: bash
 
-   docker_start --list-units
+   docker_start list --units
 
 returns a list of all available ``UNITNAME/COMMAND`` tuples.
 
@@ -77,7 +77,7 @@ file for a unit command, type
 
 .. code:: bash
 
-   docker_start --print-unit UNITNAME/COMMAND
+   docker_start run --print-unit UNITNAME/COMMAND
 
 Like all configuration files in |project|, the unit command files written in
 the YAML_ format, and consists of two documents (separated with a line
