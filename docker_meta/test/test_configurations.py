@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import os
+from argparse import Namespace
 import pytest
+from docker_meta.container import (
+    main_list)
 from docker_meta.configurations import (
     Configuration, create_parser, modify_order_list)
 from docker_meta.logger import (
@@ -105,23 +108,52 @@ test: 12
         ['DOCKERSTRA_CONF', 'DOCKER_HOST', 'BACKUP_DIR', 'test'])
 
 
-@pytest.mark.parametrize('init,command,expected', [({
-    'x1_without_build': {'command': 'build'},
-    'x2_with_build': {'command': 'build'},
-    'x1_without_build': {'command': 'create'},
-    'x2_with_build': {'command': 'start'},
-    },
-    'stop', {
-        'x2_with_build': {'command': 'stop', 'timeout': 0},
-        }),
-    ])
+dummy_modify_init_order_list = [
+    {'x1_without_build': {'command': 'build'}},
+    {'x2_with_build': {'command': 'build'}},
+    {'x1_without_build': {'command': 'create'}},
+    {'x2_with_build': {'command': 'start'}},
+    ]
+
+
+@pytest.mark.parametrize('init,command,expected', [
+    (
+        dummy_modify_init_order_list,
+        'stop', [{
+            'x2_with_build': {'command': 'stop', 'timeout': 0},
+            }]
+    ), (
+        dummy_modify_init_order_list,
+        'cleanup', [
+            {'x2_with_build': {'command': 'stop', 'timeout': 0}},
+            {'x2_with_build': {'command': 'remove', 'v': False}},
+            {'x1_without_build': {'command': 'remove', 'v': False}},
+        ]
+    ), (
+        dummy_modify_init_order_list,
+        'purge', [
+            {'x2_with_build': {'command': 'stop', 'timeout': 0}},
+            {'x2_with_build': {'command': 'remove', 'v': True}},
+            {'x1_without_build': {'command': 'remove', 'v': True}},
+            {'x2_with_build': {'command': 'remove_image'}},
+        ]
+    ), (
+        dummy_modify_init_order_list,
+        'restart', [
+            {'x2_with_build':
+                {'command': 'start', 'restart': True, 'timeout': 0}},
+        ]
+    ),
+
+    ], ids=['stop', 'cleanup', 'purge', 'restart'])
 def test_modify_order_list(init, command, expected):
 
     configurations = {
         'x1_without_build': {},
         'x2_with_build': {'build': {'tag': 'test'}},
-        'x3': {},
-        'x4': {}}
+    }
+#        'x3': {},
+#        'x4': {}}
 
     assert modify_order_list(configurations, init, command) == expected
 
@@ -148,6 +180,41 @@ def test_list_units(test_init):
         'selenium/chrome',
         ])
     assert set(c.list_units()).intersection(some_units) == some_units
+
+
+@pytest.mark.parametrize(
+    'args,expected,notexpected', [
+        ({'units': True, 'services': False},
+            ['dev_servers/start'],
+            ['Available', 'apt-cacher-ng']),
+        ({'units': False, 'services': False},
+            ['dev_servers/start'],
+            ['Available', 'apt-cacher-ng']),
+        ({'units': False, 'services': True},
+            ['apt-cacher-ng'],
+            ['Available', 'dev_servers/start'],
+         ),
+        ({'units': True, 'services': True},
+            [
+                'Available units', 'Available services:',
+                'dev_servers/start', 'apt-cacher-ng'],
+            [],
+         ),
+    ], ids=[
+        'units', 'units-default', 'services', 'both'])
+def test_list_main(test_init, capsys, args, expected, notexpected):
+    c, etcdir = test_init
+
+    nargs = Namespace(**args)
+    main_list(c, nargs)
+
+    out, _ = capsys.readouterr()
+
+    for exp in expected:
+        assert exp in out
+
+    for not_exp in notexpected:
+        assert not_exp not in out
 
 
 def test_list_services(test_init):

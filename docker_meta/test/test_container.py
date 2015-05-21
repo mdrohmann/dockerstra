@@ -27,7 +27,7 @@ configure_logger(test=True, verbosity=1)
 log = logging.getLogger(docker_meta.__name__)
 
 
-def test_main():
+def test_main_list():
     pass
 
 
@@ -189,12 +189,13 @@ def test_container_configuration_fail():
 
     with pytest.raises(ValueError) as e:
         run_configuration(
-            {'x1': {'build': 1}}, [{'x1': {'command': 'invalid'}}], '.', None)
+            None, {'x1': {'build': 1}}, [{'x1': {'command': 'invalid'}}],
+            '.', None)
         assert e.message.startswith('Invalid command invalid')
 
     with pytest.raises(ValueError) as e:
         run_configuration(
-            {}, [{'x1': {'command': 'execute'}}], '.', None)
+            None, {}, [{'x1': {'command': 'execute'}}], '.', None)
         assert e.message.startswith('Could not find a configuration for')
 
 default_events = [
@@ -234,6 +235,7 @@ def test_container_configuration(monkeypatch, expected):
         tuple_command_args(c)
 
     run_configuration(
+        None,
         {
             'x1': {'build': 'built'},
             'x2': {'creation': 'created'},
@@ -389,7 +391,7 @@ abc: """ + abc_value)
             - my_script
             - "{{.NetworkSettings.IPAddress}}({{HOSTNAME}}/cgit)"
 """)
-    configuration, order_list, config_dir = read_configuration(
+    configuration, order_list = read_configuration(
         str(testyaml), str(envyaml))
     c_expected = {
         'dummy/cgit': {
@@ -426,11 +428,10 @@ x1: abc
     x1:
         command: start
 """)
-    configurations, order_list, config_dir = read_configuration(str(testyaml))
+    configurations, order_list = read_configuration(str(testyaml))
     expect = {'x1': 'abc'}
     assert configurations == expect
     assert order_list == [{'x1': {'command': 'start'}}]
-    assert config_dir == str(tmpdir)
 
     testyaml2 = tmpdir.join('test2.yaml')
     testyaml2.write("""
@@ -443,7 +444,7 @@ x1: jkl
        command: backup
 """)
     expect2 = {'x1': 'jkl', 'x2': 'def'}
-    configurations, order_list, _ = read_configuration(str(testyaml2))
+    configurations, order_list = read_configuration(str(testyaml2))
     assert configurations == expect2
     assert order_list == [{'x1': {'command': 'backup'}}]
 
@@ -462,7 +463,7 @@ import: ["test.yaml", "test31.yaml"]
        command: backup
 """)
     expect3 = {'x1': 'abc', 'x3': 'ghi'}
-    configurations, order_list, _ = read_configuration(str(testyaml3))
+    configurations, order_list = read_configuration(str(testyaml3))
     assert configurations == expect3
     assert order_list == [{'x1': {'command': 'backup'}}]
 

@@ -104,7 +104,7 @@ def environment_substutions(fh, buf, environment={}):
 def modify_order_list(configurations, order_list, command):
     # return builds, creations and starts:
 
-    def _parse(order_list):
+    def _parse(configurations, order_list):
         builds, creations, starts = [], [], []
         for item in order_list:
             name, order = item.items()[0]
@@ -112,11 +112,11 @@ def modify_order_list(configurations, order_list, command):
             if cmd == 'start':
                 starts.append(name)
             elif cmd == 'create':
-                starts.append(name)
+                creations.append(name)
             elif cmd == 'build':
-                build_config = configurations['name'].get('build', {})
+                build_config = configurations[name].get('build', {})
                 if build_config.get('tag'):
-                    starts.append(name)
+                    builds.append(name)
         return builds, creations, starts
 
     builds, creations, starts = _parse(configurations, order_list)
@@ -131,7 +131,7 @@ def modify_order_list(configurations, order_list, command):
     if command == 'restart':
         for started in reversed(starts):
             new_order_list.append(
-                {started: {'command': 'start', 'restart': True}})
+                {started: {'command': 'start', 'restart': True, 'timeout': 0}})
     if command in ['stop', 'cleanup', 'purge']:
         for started in reversed(starts):
             new_order_list.append({started: stop_command})

@@ -446,8 +446,9 @@ class DockerContainer(object):
             if not v:
                 inspect = self.dc.inspect_container(self.name)
                 binds = set([
-                    n.split(':')[1] for n in inspect['HostConfig']['Binds']])
-                volumes_from = inspect['HostConfig']['VolumesFrom']
+                    n.split(':')[1] for n in (
+                        inspect['HostConfig']['Binds'] or [])])
+                volumes_from = inspect['HostConfig']['VolumesFrom'] or []
                 fvolumes = []
                 for vf in volumes_from:
                     finspect = self.dc.inspect_container(vf)
