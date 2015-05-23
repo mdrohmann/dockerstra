@@ -48,6 +48,9 @@ def create_parser():
         '-c', '--configdir', default=None,
         help='path to the configuration files (default is $HOME/.dockerstra)')
     subparsers = parser.add_subparsers(dest='subparser')
+    # initialization subparser (currently empty)
+    subparsers.add_parser(
+        'init', help='Initialize the configuration directory')
     run_group = subparsers.add_parser('run', help='Run a unit command')
     run_group.add_argument(
         '-e', '--environment', type=str, default='',
@@ -317,7 +320,8 @@ class Configuration(object):
                     if os.path.splitext(n)[1] == '.yaml'])
                 if (f + '/start') in fres:
                     fres = fres.union(set(
-                        [f + '/' + n for n in ['stop', 'cleanup', 'purge']]))
+                        [f + '/' + n for n in [
+                            'stop', 'restart', 'cleanup', 'purge']]))
                 res += list(fres)
             elif os.path.splitext(f)[1] == '.yaml':
                 res.append(os.path.splitext(f)[0])

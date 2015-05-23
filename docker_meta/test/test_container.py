@@ -7,7 +7,7 @@ from io import BytesIO
 import docker
 import pytest
 
-from docker_meta.configurations import (read_configuration)
+from docker_meta.configurations import (read_configuration, Configuration)
 from docker_meta.container import (DockerContainer, run_configuration)
 import docker_meta
 from docker_meta.logger import (
@@ -27,8 +27,27 @@ configure_logger(test=True, verbosity=1)
 log = logging.getLogger(docker_meta.__name__)
 
 
-def test_main_list():
-    pass
+def test_main_run(tmpdir, monkeypatch):
+    config = Configuration(tmpdir)
+    config.initialize()
+    events = []
+    tyaml = tmpdir.join('env2').join('test.yaml').ensure(file=1)
+    tyaml.write("""
+TEST: 1
+""")
+    monkeypatch.setattr(
+        docker_meta.configurations, 'read_configuration',
+        lambda *args: 1, 'order_list')
+    monkeypatch.setattr(
+        docker_meta.configurations, 'modify_order_list',
+        lambda *args: 'modified')
+    monkeypatch.setattr(
+        docker_meta.container, 'run_configuration',
+        lambda *args: events.append(list(args)))
+    monkeypatch.setattr(
+        docker_meta.container, 'get_docker_client', lambda _: None)
+    args = Namespace(environment=str(tyaml))
+    main_run(config, args)
 
 
 class TestWithDockerDaemon(object):
@@ -36,6 +55,7 @@ class TestWithDockerDaemon(object):
     uid = None
     testimage = None
     testcontainer = None
+    testcontainer2 = None
 
     @classmethod
     def setup_class(cls):
@@ -51,11 +71,16 @@ class TestWithDockerDaemon(object):
         uid = uuid.uuid4()
         self.testimage = 'test/helloworld{}'.format(uid)
         self.testcontainer = 'testcontainer{}'.format(uid)
+        self.testcontainer2 = 'testcontainer2{}'.format(uid)
         self.uid = uid
 
     def teardown_method(self, _):
         try:
             self.cli.remove_container(self.testcontainer, v=True, force=True)
+        except:
+            pass
+        try:
+            self.cli.remove_container(self.testcontainer2, v=True, force=True)
         except:
             pass
         try:
@@ -80,6 +105,10 @@ class TestWithDockerDaemon(object):
         container = DockerContainer(
             self.cli, self.testcontainer, {}, {}, self.build_instructions())
         container.create()
+
+        with pytest.raises(RuntimeError) as e:
+            container.manipulate_volumes(command=['false'])
+        assert 'failed with exit code' in str(e.value)
 
         container.manipulate_volumes(
             command=['touch', '/data/empty_file']
@@ -125,9 +154,13 @@ class TestWithDockerDaemon(object):
 
     @pytest.mark.slowtest
     def test_container_get_image(self):
+        configure_logger(test=True, verbosity=1, debug=1)
         container = DockerContainer(
             self.cli, self.testcontainer, {}, {}, self.build_instructions())
         container.build_image()
+
+        container.build_image()
+        assert 'already exists. (skipped)' in last_info_line()[0]
 
         assert container.get_image(self.testimage)
         assert container.get_image('{}:latest'.format(self.testimage))
@@ -136,11 +169,60 @@ class TestWithDockerDaemon(object):
         assert not container.get_image('non-existent')
 
     @pytest.mark.slowtest
-    def test_container_creation(self):
+    def test_pull_remove(self):
+        container = DockerContainer(
+            self.cli, self.testcontainer, {'image': 'hello-world'})
+
+        image_exists = container.get_image()
+
+        def _remove_image(container):
+            container.remove_image()
+            assert not container.get_image()
+            # Do it twice to show, that second time returns without error
+            container.remove_image()
+            assert not container.get_image()
+
+        if image_exists:
+            _remove_image(container)
+
+        container.build_image()
+
+        assert container.get_image()
+
+        if not image_exists:
+            _remove_image(container)
+
+    @pytest.mark.slowtest
+    def test_container_creation_fail(self):
+        configure_logger(test=True, verbosity=1, debug=1)
+        container = DockerContainer(self.cli, self.testcontainer, {})
+        with pytest.raises(RuntimeError) as e:
+            container.build_image()
+        assert 'No image to pull or build given.' in str(e.value)
+        container.stop()
+        assert 'Trying to stop container' in last_info_line()[0]
+
+        container.remove()
+        assert 'it did not exist.' in last_info_line()[0]
+
+        container = DockerContainer(
+            self.cli, self.testcontainer, {'name': self.testcontainer})
+        with pytest.raises(RuntimeError) as e:
+            container.create()
+        assert 'Creation requires a build tag or an image id' in str(e.value)
+
+    @pytest.mark.slowtest
+    @pytest.mark.parametrize(
+        'with_volumes_from',
+        [False, True])
+    def test_container_creation(self, tmpdir, with_volumes_from):
+        configure_logger(test=True, verbosity=1, debug=1)
         creation = {'image': self.testimage}
         container = DockerContainer(self.cli, self.testcontainer, creation)
-        with pytest.raises(RuntimeError):
+        with pytest.raises(RuntimeError) as e:
             container.start()
+
+        assert 'No build instructions for image' in str(e.value)
 
         assert str(container) == "No id yet"
 
@@ -150,39 +232,68 @@ class TestWithDockerDaemon(object):
             'tag': self.testimage,
             }
 
+        datatemps = None
+        if with_volumes_from:
+            startup = {
+                'binds': {str(tmpdir): {'bind': '/data', 'ro': False}},
+                'volumes_from': self.testcontainer2,
+            }
+            datatemps = DockerContainer(
+                self.cli, self.testcontainer2,
+                {'image': 'busybox', 'volumes': ['/data2']})
+            datatemps.create()
+        else:
+            startup = {}
+
         container = DockerContainer(
-            self.cli, self.testcontainer, {}, {}, build_instructions)
-        container.start()
+            self.cli, self.testcontainer, {}, startup, build_instructions)
 
         container.start()
+
+        # Do it twice, to see that there are no errors the second time.
+        container.start()
+
+        # Also try to create it, and assert the debug message
+        container.create()
+        assert 'seems to exist already (skipped)' in last_info_line()[0]
+
         time.sleep(0.01)
         assert container.is_started()
 
         assert str(container)
 
         # delete container and it should work again afterwards...
-
         container.stop(timeout=0)
 
-        # container has attached volume, that needs to be removed... skipped
-        # with v==False
+        # container has attached volume, that needs to be removed...
         container.remove(v=False)
-        assert container.get_container()
+        if with_volumes_from:
+            assert not container.get_container()
+            datatemps.remove(v=True)
 
-        container.remove(v=True)
-        assert not container.get_container()
-        container.start()
+            # cannot start again, because the volumes_from container is gone.
+            with pytest.raises(RuntimeError):
+                container.start()
+        else:
 
-        assert container.get_container()
+            # removal is skipped with v==False
+            assert container.get_container()
 
-        # make sure, that containers with subset of the name are not found
-        sub_name_container = DockerContainer(
-            self.cli, self.testcontainer[2:-2])
-        assert not sub_name_container.get_container()
+            container.remove(v=True)
+            assert not container.get_container()
 
-        container.start(restart=True, timeout=0)
-        time.sleep(0.01)
-        assert container.is_started()
+            container.start()
+
+            assert container.get_container()
+
+            # make sure, that containers with subset of the name are not found
+            sub_name_container = DockerContainer(
+                self.cli, self.testcontainer[2:-2])
+            assert not sub_name_container.get_container()
+
+            container.start(restart=True, timeout=0)
+            time.sleep(0.01)
+            assert container.is_started()
 
 
 def test_container_configuration_fail():
@@ -210,6 +321,7 @@ default_events = [
     ('restore', ['x2', os.getcwd(), 'backup']), 0,
     ('execute', ['x2', ['rm', '/var/cache'], False, {}]), 0,
     ('execute', ['host', ['echo', 'hallo'], True, {}]), 0,
+    ('remove_image', ['x1']), 0,
     ]
 
 
@@ -231,7 +343,7 @@ def test_container_configuration(monkeypatch, expected):
 
     for c in [
             'start', 'create', 'build_image', 'stop', 'remove',
-            'backup', 'restore', 'execute']:
+            'backup', 'restore', 'execute', 'remove_image']:
         tuple_command_args(c)
 
     run_configuration(
@@ -286,6 +398,9 @@ def test_container_configuration(monkeypatch, expected):
                 'run': ['echo', 'hallo'],
                 'shell': True,
             }},
+            {'x1': {
+                'command': 'remove_image',
+            }},
         ],
         '.',
         None)
@@ -315,6 +430,18 @@ def test_execute_on_host():
     assert res == 0
     assert last_info_line()[0].endswith(': welt')
     assert last_error_line()[0].endswith(': bar')
+
+
+def test_execute_not_on_host(monkeypatch):
+    events = []
+    monkeypatch.setattr(
+        DockerContainer, 'manipulate_volumes',
+        lambda *args, **kwargs: events.append(list(args)))
+
+    dc = DockerContainer(None, 'test')
+    dc.execute(['testcommand'])
+
+    assert events[0][1] == ['testcommand']
 
 
 @pytest.mark.parametrize(

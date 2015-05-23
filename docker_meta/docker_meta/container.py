@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import json
 import logging
 import os
 import re
@@ -79,9 +80,15 @@ def main(args):
 
     try:
         config = Configuration(args.configdir)
-        if not config.initialized:
-            config.initialize()
 
+        if args.subparser == 'init':
+            config.initialize()
+        else:
+            if not config.initialized:
+                raise RuntimeError(
+                    "Could not find an initialized configuration directory.  "
+                    "Maybe you need to run the 'init' command"
+                )
         if args.subparser == 'run':
             main_run(config, args)
         elif args.subparser == 'list':
@@ -158,6 +165,8 @@ class DockerContainer(object):
     def get_image(self, name=None):
         if name is None:
             name = self.creation.get('image', self.build.get('tag', None))
+        if name is None:
+            return {}
         name_split = name.rsplit(':', 1)
         images = self.dc.images(name_split[0])
         if len(images) == 1:
@@ -165,20 +174,16 @@ class DockerContainer(object):
                 return {}
             else:
                 return images[0]
-        elif len(images) == 0:
+        else:  # len(images) == 0:
             return {}
-        else:
-            raise RuntimeError("This should not happen!")
 
     def get_container(self):
         containers = self.dc.containers(
             filters={'name': "^/{}$".format(self.name)}, all=True)
         if len(containers) == 1:
             return containers[0]
-        elif len(containers) == 0:
+        else:  # len(containers) == 0:
             return {}
-        else:
-            raise RuntimeError("This should not happen!")
 
     def __str__(self):
         return self.get_container().get('Id', 'No id yet')
@@ -240,6 +245,9 @@ class DockerContainer(object):
                             repository=image, tag=tag, stream=True):
                         log.info(line, extra={'type': 'output', 'cmd': 'pull'})
                         # print(response.get('progressDetail'))
+                    last_line = json.loads(line)
+                    if 'error' in last_line:
+                        raise RuntimeError(last_line['error'])
                     log.info(
                         "Successfully pulled the image {}".format(image))
                 except Exception as e:
@@ -307,15 +315,14 @@ class DockerContainer(object):
                 "No configuration to create the container given.")
 
         self.creation['name'] = self.name
-        try:
-            self.creation['image'] = self.build.get(
-                'tag', self.creation.get('image'))
-            log.debug(
-                "set creation fields for 'name' and 'image' to {name} and "
-                "{image}".format(**(self.creation)))
-        except KeyError:
+        self.creation['image'] = self.build.get(
+            'tag', self.creation.get('image'))
+        if not self.creation['image']:
             raise RuntimeError(
                 "Creation requires a build tag or an image id.")
+        log.debug(
+            "set creation fields for 'name' and 'image' to {name} and "
+            "{image}".format(**(self.creation)))
         if self.get_container():
             log.debug(
                 "The container {} seems to exist already (skipped)."
@@ -354,12 +361,10 @@ class DockerContainer(object):
 
         stdout = self.dc.logs(info)
 
-        self.dc.remove_container(info)
-
-        info = (
+        info_line = (
             'Executing command {} on container {}.  Output follows\n{}'
             .format(command, self.name, stdout))
-        self._log_output(info, 'manipulate_volumes')
+        self._log_output(info_line, 'manipulate_volumes')
 
         if exit_code != 0:
             stderr = self.dc.logs(info, stdout=False, stderr=True, tail=3)
@@ -367,6 +372,7 @@ class DockerContainer(object):
                 "Manipulation of volume {} failed with exit code {}:\n{}"
                 .format(command, exit_code, stderr))
 
+        self.dc.remove_container(info)
         log.info(
             "Successfully executed command {} in container {}."
             .format(command, self.name))
