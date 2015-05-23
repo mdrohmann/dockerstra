@@ -2,14 +2,18 @@ import logging
 import os
 import time
 import uuid
+from argparse import Namespace
 from io import BytesIO
 
 import docker
 import pytest
+import yaml
 
-from docker_meta.configurations import (read_configuration, Configuration)
-from docker_meta.container import (DockerContainer, run_configuration)
 import docker_meta
+from docker_meta.configurations import (
+    read_configuration, Configuration)
+from docker_meta.container import (
+    DockerContainer, run_configuration, main_run, main)
 from docker_meta.logger import (
     configure_logger, last_info_line, last_error_line)
 
@@ -27,27 +31,87 @@ configure_logger(test=True, verbosity=1)
 log = logging.getLogger(docker_meta.__name__)
 
 
-def test_main_run(tmpdir, monkeypatch):
-    config = Configuration(tmpdir)
+@pytest.mark.parametrize('unitcommand,env,error', [
+    ('dev_servers/start', True, None),
+    ('dev_servers/restart', False, None),
+    ('invalid/start', False, RuntimeError),
+])
+def test_main_run(tmpdir, monkeypatch, capsys, unitcommand, env, error):
+    config = Configuration(str(tmpdir))
     config.initialize()
     events = []
     tyaml = tmpdir.join('env2').join('test.yaml').ensure(file=1)
     tyaml.write("""
 TEST: 1
 """)
-    monkeypatch.setattr(
-        docker_meta.configurations, 'read_configuration',
-        lambda *args: 1, 'order_list')
-    monkeypatch.setattr(
-        docker_meta.configurations, 'modify_order_list',
-        lambda *args: 'modified')
+    docker_meta.configurations = reload(docker_meta.configurations)
     monkeypatch.setattr(
         docker_meta.container, 'run_configuration',
         lambda *args: events.append(list(args)))
     monkeypatch.setattr(
         docker_meta.container, 'get_docker_client', lambda _: None)
-    args = Namespace(environment=str(tyaml))
-    main_run(config, args)
+
+    if env:
+        environment = str(tyaml)
+    else:
+        environment = {}
+
+    for po in [False, True]:
+        args = Namespace(
+            daemon=None,
+            environment=environment,
+            unitcommand=unitcommand, print_only=po)
+
+        if error:
+            with pytest.raises(error):
+                main_run(config, args)
+            return
+
+        main_run(config, args)
+
+        if po:
+            out, _ = capsys.readouterr()
+            outlist = list(yaml.load_all(out))
+        else:
+            outlist = events.pop()[1:3]
+
+        assert 'git_repos' in outlist[0]
+        assert outlist[1][0].keys()[0] in ['nginx', 'git_repos', 'cgit']
+
+
+@pytest.fixture
+def test_main_init(tmpdir, monkeypatch):
+
+    args_init = Namespace(configdir=str(tmpdir), subparser='init')
+    main(args_init)
+
+    config = Configuration(str(tmpdir))
+    assert config.initialized
+    return tmpdir
+
+
+@pytest.mark.parametrize('subcommand', ['run', 'list'])
+def test_main_other(test_main_init, monkeypatch, subcommand):
+    tmpdir = test_main_init
+    events = []
+    monkeypatch.setattr(
+        docker_meta.container, 'main_run',
+        lambda *args, **kwargs: events.append('run'))
+    monkeypatch.setattr(
+        docker_meta.container, 'main_list',
+        lambda *args, **kwargs: events.append('list'))
+
+    args = Namespace(configdir=str(tmpdir), subparser=subcommand)
+    main(args)
+    assert events.pop() == subcommand
+
+
+def test_main_fail(tmpdir):
+    args = Namespace(configdir=str(tmpdir), subparser='run')
+    main(args)
+
+    assert last_error_line()[0].endswith(
+        "Maybe you need to run the 'init' command")
 
 
 class TestWithDockerDaemon(object):

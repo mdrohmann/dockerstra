@@ -20,7 +20,7 @@ import: start.yaml
         - nginx-gen.py
         - --remove
         - -o
-        - {{DOCKERCONF}}/services/nginx/etc
+        - {{DOCKERSTRA_CONF}}/services/nginx/etc
         - cgit
         - gitolite
         - pypicloud

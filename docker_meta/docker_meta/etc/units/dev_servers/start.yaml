@@ -1,4 +1,4 @@
-import: ["nginx_server.yaml"]
+import: ["../nginx_server/start.yaml"]
 git_repos:
     build:
         path: data/repositories
@@ -94,7 +94,7 @@ apt-cacher-ng:
         - /usr/bin/python
         - nginx-gen.py
         - -o
-        - {{DOCKERCONF}}/services/nginx/etc
+        - {{DOCKERSTRA_CONF}}/services/nginx/etc
         - cgit
         - gitolite
         - pypicloud

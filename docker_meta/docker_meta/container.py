@@ -44,7 +44,12 @@ def main_run(config, args):
         if configfile:
             configurations, order_list = read_configuration(
                 configfile, environment)
-            order_list = modify_order_list(order_list, command)
+            order_list = modify_order_list(
+                configurations, order_list, command)
+        else:
+            raise RuntimeError(
+                "Could not create a configuration for unit/command tuple {}!"
+                .format(args.unitcommand))
 
     if args.print_only:
         print yaml.safe_dump_all([configurations, order_list])
