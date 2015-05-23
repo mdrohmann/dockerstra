@@ -1,0 +1,4 @@
+# configuration files for the dockerstra runtime script
+
+DOCKER_HOST: /var/run/docker.sock
+BACKUP_DIR: {{conf.home}}/.docker_backup

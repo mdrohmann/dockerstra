@@ -1,0 +1,107 @@
+import: ["nginx_server.yaml"]
+git_repos:
+    build:
+        path: data/repositories
+        tag: data/repositories
+    creation:
+        name: git_repos
+
+data_pypi:
+    build:
+        path: data/pypicloud
+        tag: data/pypicloud
+    creation:
+        name: pypi_data
+
+gitolite:
+    build:
+        path: services/gitolite
+        tag: mdrohmann/gitolite
+    creation:
+        name: gitolite
+        volumes: ["/home/git/.ssh"]
+    startup:
+        volumes_from: git_repos
+        port_bindings: {22: 2022}
+
+cgit:
+    build:
+        path: services/cgit
+        tag: mdrohmann/cgit
+    creation:
+        name: cgit
+    startup:
+        volumes_from: git_repos
+        port_bindings: {80: 12345}
+        binds:
+            ${CONFIG_DIR}/etc:
+                bind: '/data'
+                ro: False
+
+pypicloud:
+    build:
+        path: services/pypicloud
+        tag: mdrohmann/pypicloud
+    creation:
+        name: pypicloud
+    startup:
+        volumes_from: data_pypi
+        binds:
+            ${CONFIG_DIR}/pypicloud:
+                bind: /etc/pypicloud
+                ro: False
+        port_bindings: {3031: 3031}
+
+apt-cacher-ng:
+    build:
+        path: services/apt-cacher-ng
+        tag: mdrohmann/apt-cacher-ng
+    creation:
+        name: apt-cacher-ng
+    startup:
+        binds:
+            /tmp/cache/apt-cacher-ng:
+                bind: /var/cache/apt-cacher-ng
+                ro: False
+        port_bindings:
+            3142: 3142
+
+---
+
+-
+  git_repos:
+      command: create
+-
+  data_pypi:
+      command: create
+-
+  apt-cacher-ng:
+      command: start
+      wait: 1
+-
+  gitolite:
+      command: start
+-
+  cgit:
+      command: start
+-
+  pypicloud:
+      command: start
+-
+  host:
+      command: execute
+      run:
+        - /usr/bin/python
+        - nginx-gen.py
+        - -o
+        - {{DOCKERCONF}}/services/nginx/etc
+        - cgit
+        - gitolite
+        - pypicloud
+-
+  nginx:
+      command: start
+      restart: True
+      timeout: 0
+
+# vim: set sw=4 et:

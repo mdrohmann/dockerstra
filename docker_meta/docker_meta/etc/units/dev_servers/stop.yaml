@@ -1,0 +1,33 @@
+import: start.yaml
+---
+-
+  apt-cacher-ng:
+      command: stop
+-
+  gitolite:
+      command: stop
+-
+  cgit:
+      command: stop
+-
+  pypicloud:
+      command: stop
+-
+  host:
+      command: execute
+      run:
+        - /usr/bin/python
+        - nginx-gen.py
+        - --remove
+        - -o
+        - {{DOCKERCONF}}/services/nginx/etc
+        - cgit
+        - gitolite
+        - pypicloud
+-
+  nginx:
+      command: start
+      restart: True
+      timeout: 0
+
+# vim: set sw=4 et:

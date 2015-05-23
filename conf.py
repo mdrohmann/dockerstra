@@ -48,9 +48,14 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'My docker docu'
+project = u'Dockerstra'
 copyright = u'2015, Martin C Drohmann'
 author = u'Martin C Drohmann'
+
+rst_epilog = u"""
+.. |project| replace:: DOCKERSTRA
+.. |cmd| replace:: docker_start.py
+"""
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

@@ -1,0 +1,12 @@
+import: start.yaml
+---
+-
+  git_repos:
+    command: restore
+    restore_dir: {{BACKUPDIR}}/dev_servers
+    restore_name: git_repos
+-
+  data_pypi:
+    command: restore
+    restore_dir: {{BACKUPDIR}}/dev_servers
+    restore_name: pypicloud

@@ -11,10 +11,10 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
-   data/README
-   services/README
+   docker_meta/docker_meta/etc/data/README
+   docker_meta/docker_meta/etc/services/README
 
-   systemd/docs/index
+   docker_meta/docs/index
 
 
 Indices and tables

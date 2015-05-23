@@ -1,0 +1,5 @@
+include ez_setup.py
+recursive-include test *.py
+recursive-include docker_meta/jinja *
+recursive-include docker_meta/etc *
+recursive-exclude docker_meta/etc *.sw[onp]
