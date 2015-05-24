@@ -244,12 +244,25 @@ execute
 Environment files
 `````````````````
 
-Environment files 
+Environment files define variables that are substituted in unit configuration
+files, **before** they are parsed.  This allows to define the configuration
+relatively to a directory that is specified in a host specific environment
+file, for example.  Some environment variables are added automatically, most
+importantly the variable ``{{DOCKERSTRA_CONF}}`` pointing to the base directory
+of the configuration file structure.
 
 .. _services:
 
-Service and data directories
-````````````````````````````
+Service and data images
+```````````````````````
+
+The ``{{DOCKERSTRA_CONF}}`` directory usually has subdirectories ``services``
+and ``data``.  A directory ``services/cgit`` eg., defines a service called
+``cgit``, and should at least contain a ``Dockerfile`` describing how to
+generate an image for this service.  Technically, there is no difference
+between ``data`` and ``service`` directories, but data images in general only
+contain volumes that can be mounted in a container derived from a service
+image.
 
 .. _YAML: http://yaml.org
 .. _docker-py: http://docker-py.readthedocs.org
