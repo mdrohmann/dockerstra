@@ -385,7 +385,7 @@ default_events = [
     ('restore', ['x2', os.getcwd(), 'backup']), 0,
     ('execute', ['x2', ['rm', '/var/cache'], False, {}]), 0,
     ('execute', ['host', ['echo', 'hallo'], True, {}]), 0,
-    ('remove_image', ['x1']), 0,
+    ('remove_image', ['x1', False, False]), 0,
     ]
 
 

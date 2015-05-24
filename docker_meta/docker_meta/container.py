@@ -444,13 +444,17 @@ class DockerContainer(object):
                 "Not stopping container {} as it was not running"
                 .format(self.name))
 
-    def remove_image(self):
+    def remove_image(self, force=False, noprune=False):
         image = self.get_image()
         if image:
-            self.dc.remove_image(image)
-            log.info('Successfully removed the image {}.'.format(image))
+            self.dc.remove_image(image, force, noprune)
+            log.info("Successfully removed the image {}".format(image))
+        else:
+            log.debug(
+                "Trying to remove image {}. But it does not exist. (Skipping)"
+                .format(image))
 
-    def remove(self, v=False, timeout=10):
+    def remove(self, v=True, timeout=10):
         self.stop(timeout)
         container = self.get_container()
         if container:
@@ -520,7 +524,9 @@ def run_configuration(
         elif cmd == 'stop':
             container.stop(timeout)
         elif cmd == 'remove_image':
-            container.remove_image()
+            force = orders.pop('force', False)
+            noprune = orders.pop('noprune', False)
+            container.remove_image(force, noprune)
         elif cmd == 'remove':
             v = orders.pop('v', False)
             container.remove(v, timeout)
