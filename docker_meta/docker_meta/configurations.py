@@ -230,6 +230,14 @@ def _iswritable(directory):
 
 
 class Configuration(object):
+    """
+    controls the configuration directory.
+
+    TODO: I also need a control for active environment substitutions of a unit.
+
+    I am ignoring this right now, until the environment substitution feature is
+    implemented.
+    """
 
     valid_basedirs = [
         (os.getenv('HOME', '/invalidchoice'), '.dockerstra',),
@@ -336,6 +344,37 @@ class Configuration(object):
 
     def split_unit_command(self, unitcommand):
         return unitcommand.rsplit('/', 1)
+
+    def list_tagged_variants(self, base_config):
+        raise NotImplementedError()
+
+    def list_test_variants(self, base_config):
+        raise NotImplementedError()
+
+    def get_base_configfile(self, unit, command):
+        units_base_path = self.get_abspath('units')
+        # check if command file exists explicitly
+        candidate1 = os.path.join(
+            units_base_path, unit, '{}.yaml'.format(command))
+        if os.path.exists(candidate1):
+            return candidate1
+        else:  # check if command exists, and return start file in this case.
+            if '{}/{}'.format(unit, command) in self.list_units():
+                return self.get_base_configfile(unit, 'start')
+
+        return None
+
+    def list_variants(self, unitcommand):
+        unit, command = self.split_unit_command(unitcommand)
+        if command == 'test':
+            return self.list_test_variants(unit)
+        else:
+            base_config = self.get_base_configfile(unit, command)
+            if not base_config:
+                raise RuntimeError(
+                    "Invalid command: No configuration file for {}/{}"
+                    .format(unit, command))
+            return self.list_tagged_variants(base_config)
 
     def list_units(self, list_commands=True):
         units_base_path = self.get_abspath('units')
