@@ -268,7 +268,7 @@ class DockerContainer(object):
     def inspect(self):
         return self.dc.inspect_container(self.name)
 
-    def _substitute_run_args(self, args):
+    def _substitute_runtime_args(self, args):
         new_args = []
         pattern = re.compile(
             '^{{(?P<formula>.*)}}(\((?P<container>[^)]*)\))?$')
@@ -295,7 +295,7 @@ class DockerContainer(object):
         return new_args
 
     def execute(self, run_args, shell=False, binds={}):
-        self._substitute_run_args(run_args)
+        self._substitute_runtime_args(run_args)
 
         if self.name == 'host':
 

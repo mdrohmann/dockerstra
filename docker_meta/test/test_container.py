@@ -539,7 +539,7 @@ def test_substitute_run_args(container_handle, expected_name):
 
     mock_dc = MockDocker()
     dc = DockerContainer(mock_dc, 'test')
-    res = dc._substitute_run_args([
+    res = dc._substitute_runtime_args([
         "{{inspect['Name']}}" + container_handle,
         "{{inspect['NetworkSettings']['IPAddress']}}",
         "{{inspect['NetworkSettings']['Ports'].keys()}}"
