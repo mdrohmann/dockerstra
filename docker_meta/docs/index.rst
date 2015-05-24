@@ -31,19 +31,22 @@ information about the output of the docker-py_ commands.
 By default, the configuration files for ``docker_start`` situate in one of
 these places referred to as ``$DOCKERSTRA_CONF``:
 
-- ``$HOME/.dockerstra``
-- ``PYTHON_INSTALL_DIR/etc/dockerstra``
-- ``/etc/dockerstra``
+  - ``$HOME/.dockerstra``
+  - ``PYTHON_INSTALL_DIR/etc/dockerstra``
+  - ``/etc/dockerstra``
 
 Select a configuration directory explicitly with the option ``-c``.
+
+Configuration
+-------------
 
 The directory ``$DOCKERSTRA_CONF`` has the following subdirectories that will
 be described in detail:
 
-- :ref:`environments<environments>`
-- :ref:`services<services>`
-- :ref:`data<services>`
-- :ref:`units<units>`
+  - :ref:`environments<environments>`
+  - :ref:`services<services>`
+  - :ref:`data<services>`
+  - :ref:`units<units>`
 
 .. _units:
 
@@ -122,13 +125,21 @@ Alternatively, the first document can simply be of the form:
 in which case the container descriptions are read from the file
 ``other_file.yaml``.
 
-List of commands
-****************
+Links
++++++
 
-The second document describes a list of commands to execute on the previously
+TODO: There needs to be a special handling of links and how to name them.  We
+want to have a fall-back extra_hosts entry in case, the link to a container is
+not available.  In that case, some service should be queried in order to find
+out if the container is published on a different instance.
+
+List of orders
+**************
+
+The second document describes a list of orders to execute on the previously
 defined containers.  The document is a list of dictionaries with only one key
 (the container name to execute a command on).  The value of this dictionary is
-another dictionary specifying a :ref:`command <commands>` and its arguments.
+another dictionary specifying a :ref:`list of orders <orders>` and its arguments.
 
 Example
 ```````
@@ -161,12 +172,12 @@ An example configuration file looks like this:
      gitolite:
        command: start
 
-.. _commands:
+.. _orders:
 
-Commands
-````````
+Orders
+``````
 
-The following commands can be specified in the list of commands:
+The following ``commands`` can be specified in the list of orders:
 
 build
   builds a new image. This calls `build()` from docker-py_ with the options
@@ -235,8 +246,18 @@ remove_image
   removes the image associated with the container.
 
 execute
-  executes a command either on the file system of the host container or in the
-  special container named ``host`` that is only valid for this command.
+  executes a command either
+    1. on the file system of the container,
+    2. in a temporary container created from the base image,
+    3. inside a running container or even on
+    4. the host system.
+
+  For the latter choice, simply run the command in a *virtual container* called
+  ``host``.  If an existing container is specified, by default, the command is
+  executed on the file system of the container.  If you want to execute the
+  command in a temporary container or in a running container, specify the
+  ``type`` argument.  If no running container is found, and ``type`` is
+  specified as ``in_running``, then ``temporary`` is used as a fall-back.
 
   **Arguments**:
     run
@@ -245,7 +266,26 @@ execute
       whether to execute it in a shell
     binds
       a dictionary of volume binds for the host system
+    type
+      the execution type (one of ``file_system``, ``temporary``,
+      ``in_running``)
+tag
+  tags an image with an additional tag
+commit
+  makes an updated image commit from a container
+push
+  pushes an image to a remote repository
 
+
+Variants
+++++++++
+
+There is one argument that is valid of all commands in the list of orders,
+called ``variants``.  This should get a list of strings.  If there are variants
+specified in a configuration file, then the ``unit/command`` can be filtered in
+the following way ``unit/command:variant1:variant2:...:variantn``.  This
+selects only the orders tagged with the specified variant strings.  You could
+use this, to define a minimal set of development servers for example.
 
 .. _environments:
 
@@ -266,6 +306,25 @@ As a special option, the ``start.yaml`` file can have a third document.  This
 document defines a parametrization of the environment, that can be controlled
 via the command line of the docker_start.py command.
 
+The third document is simply a list of argparse.add_argument invocations:
+
+.. code::yaml::
+
+ - add_argument:
+     name: '--language'
+     short: '-l'
+     choices: ['python', 'node']
+     default: 'python'
+     help: 'language of the host container'
+ - add_argument:
+     name: 'command'
+     choices: ['initialize', 'exec', 'host-exec', 'bash', 'daemon', 'single', 'upgrade']
+     default: 'initialize'
+     help: 'define what to do with the container'
+ - add_argument:
+     name: 'args'
+     nargs: argparse.REMAINDER
+
 .. _services:
 
 Service and data images
@@ -278,6 +337,25 @@ generate an image for this service.  Technically, there is no difference
 between ``data`` and ``service`` directories, but data images in general only
 contain volumes that can be mounted in a container derived from a service
 image.
+
+
+Updates
+*******
+
+If the unit directory has a command ``unit/update``, it should execute a script
+to create a temporary container.  As the last order in this list, you can
+specify a command called ``tests`` on the virtual container ``host``, with an
+argument list called ``tests`` as well.  This list comprises command line
+arguments for test runs, that will be executed in this step.  This way, the
+``unit/update`` command is only considered successful if all the tests work
+after updating the image.  This way, you can make sure, that the tag ``latest``
+is only applied if the update worked.
+
+For every ``unit/update`` command, |project| automatically generates a
+``unit/upgrade`` command, that re-creates and re-starts all running containers
+that depend on the updated image.
+
+.. seealso:: :ref:`variants`
 
 .. _unittests:
 
@@ -379,7 +457,20 @@ linking to the latest TIMESTAMP.
   The ``test_data`` container should also save the configured environment to
   have all the necessary data to reproduce the results.
 
+.. note::
+
+  If a test variant is configured for a container that is not started in the
+  unit/start order of commands, it will be started during the test run, and
+  removed after it is not needed anymore.
+
 .. _YAML: http://yaml.org
 .. _docker-py: http://docker-py.readthedocs.org
+
+Extra scripts
+-------------
+
+TODO There is a script available, that updates nginx configuration files based on
+the available hosts.  Maybe this should be a separate container, that I simply
+restart...  I think that is a better idea.
 
 .. vim:set et sw=2 ts=8 spell spelllang=en:
