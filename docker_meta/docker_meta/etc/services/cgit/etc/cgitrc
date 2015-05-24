@@ -130,48 +130,6 @@ readme=:index.rst
 ##
 
 
-repo.url=voteapp
-repo.path=/repositories/voteapp.git/
-repo.desc=the voteapp repository
-repo.owner="Martin C. Drohmann <mdrohmann@gmail.com>"
-
-repo.url=voteapp-businessplan
-repo.path=/repositories/voteapp-businessplan.git
-repo.desc=the business plan for the voteapp
-repo.owner="Martin C. Drohmann <mdrohmann@gmail.com>"
-
-repo.url=d3mvc
-repo.path=/repositories/d3mvc.git
-repo.desc=the d3 model-view-controller extension
-repo.owner="Martin C. Drohmann <mdrohmann@gmail.com>"
-
-repo.url=txtemplates
-repo.path=/repositories/txtemplates.git
-repo.desc=Twisted templates for servers
-repo.owner="Martin C. Drohmann <mdrohmann@gmail.com>"
-
-repo.url=sphinx-project-timeline-plugin
-repo.path=/repositories/sphinx-project-timeline-plugin.git
-repo.desc=timeline plugin for sphinx documentation
-repo.owner="Martin C. Drohmann <mdrohmann@gmail.com>"
-
-repo.url=money
-repo.path=/repositories/money.git
-repo.desc=Money manager
-repo.owner="Martin C. Drohmann <mdrohmann@gmail.com>"
-
-repo.url=docker
-repo.path=/repositories/docker.git
-repo.desc=Docker services and data files plus docker_meta
-repo.owner="Martin C. Drohmann <mdrohmann@gmail.com>"
-
-# The next repositories will be displayed under the 'extras' heading
-section=extras
-
-repo.url=garten
-repo.path=/repositories/garten.git
-repo.desc=Kleingarten project for my dad
-repo.owner="Martin C. Drohmann <mdrohmann@gmail.com>"
 
 
 # Add some mirrored repositories

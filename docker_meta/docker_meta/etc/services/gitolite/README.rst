@@ -3,6 +3,13 @@ Gitolite
 
 Runs a gitolite_ server.
 
+Configuration
+-------------
+
+No, configuration is necessary.  On its first start, the initial gitolite
+repositories including an admin user with a new SSH key are generated, and
+re-used in the following.  Refer to the usage information below on how to use
+this container after it is started.
 
 Dependent images
 ----------------
@@ -53,5 +60,13 @@ Usage
       User git
       Compression no
       ForwardX11 no
+
+4. Clone the admin repository like this:
+
+   ::
+
+      git clone git@gitolite_local:gitolite-admin
+
+   and add user keys and new repositories.  Easy-peasy...
 
 .. _gitolite: http://gitolite.com/gitolite

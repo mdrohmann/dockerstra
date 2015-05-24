@@ -3,6 +3,13 @@ CGIT server
 
 This docker container starts a cgit_ server.
 
+Configuration
+-------------
+
+The service is configured with the ``etc/cgitrc``.  Either leave it as-is, in
+which case a homepage for every repository is generated, or configure it
+according to the `manual page <http://linux.die.net/man/5/cgitrc>`_.
+
 Dependent images
 ----------------
 

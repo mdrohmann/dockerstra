@@ -3,6 +3,14 @@ Apt-cacher-NG
 
 Runs an apt-cacher-ng service.
 
+Configuration
+-------------
+
+Nothing needs to be configured here, really.  Although it would be nice to
+forward requests to repositories that are secured with SSL encrypted
+connections.  If you have a suggestion how to do that, please update the
+acng.conf and let me know.
+
 Depedent images
 ---------------
 
