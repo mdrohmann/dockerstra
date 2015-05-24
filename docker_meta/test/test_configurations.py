@@ -135,47 +135,167 @@ dummy_modify_init_order_list = [
     {'x2_with_build': {'command': 'start'}},
     ]
 
+test_start1 = [
+    {'host': {
+        'command': 'unit',
+        'unit': 'dockerstra/start',
+        'args': ['test', 'unit/start' + ":variant", 'tempid']}}
+]
+test_start2 = [
+    {'host': {
+        'command': 'unit',
+        'unit': 'dockerstra/start',
+        'args': ['test', 'unit/start', 'tempid', 'tempid']}}
+]
 
+# ATTENTION: The unit/start tagged variants are inherited by the test
+# variants!!!!
+
+# QUESTION: Should I put dockerstra in a unit itself???  That would be crazy,
+# but would allow me later to easily create tests in a unified way... I
+# actually like it!!!, Then, I do not need try_always either, and all the
+# testing functionality is out-sourced to the dockerstra container.  I should
+# create a separate file for the dockerstra_test container....
+test_collection = [
+    # We should separate
+    # between external and internal tests( internal are software library tests,
+    # external are more like end-to-end tests, checking if a docker
+    # container is started)
+    {'host': {
+        'command': 'unit',
+        'unit': 'dockerstra/start',
+        'args': ['collect_external', 'unit/test', 'tempid']}},   # once we need, once we don't...
+    {'host': {
+        'command': 'unit',
+        'unit': 'dockerstra/start',
+        'args': ['collect_internal', 'unit/test']}},
+]
+test_remove_container1 = [
+    {'dockerstra_test': {
+        'command': 'unit',
+        'args': ['test', 'unit/cleanup', 'tempid']}}
+]
+
+test_remove_container2 = [
+    {'dockerstra_test': {
+        'command': 'unit',
+        'args': ['test', 'unit/purge', 'tempid', 'tempid']}}
+]
+test_configurations1 = {
+    'x1_without_build_testid': {},
+    'x2_with_build_testid': {'build': {'tag': 'test'}},
+}
+test_configurations2 = {
+    'x1_without_build_testid': {},
+    'x2_with_build_testid': {'build': {'tag': 'test_testid'}},
+}
+
+
+@pytest.mark.current
 @pytest.mark.parametrize('init,command,expected', [
     (
         dummy_modify_init_order_list,
-        'stop', [{
+        'stop', ([{
             'x2_with_build': {'command': 'stop', 'timeout': 0},
-            }]
+            }], None)
     ), (
         dummy_modify_init_order_list,
-        'cleanup', [
+        'cleanup', ([
             {'x2_with_build': {'command': 'stop', 'timeout': 0}},
             {'x2_with_build': {'command': 'remove', 'v': False}},
             {'x1_without_build': {'command': 'remove', 'v': False}},
-        ]
+        ], None)
     ), (
         dummy_modify_init_order_list,
-        'purge', [
+        'purge', ([
             {'x2_with_build': {'command': 'stop', 'timeout': 0}},
             {'x2_with_build': {'command': 'remove', 'v': True}},
             {'x1_without_build': {'command': 'remove', 'v': True}},
             {'x2_with_build': {'command': 'remove_image'}},
-        ]
+        ], None)
     ), (
         dummy_modify_init_order_list,
-        'restart', [
+        'restart', ([
             {'x2_with_build':
                 {'command': 'start', 'restart': True, 'timeout': 0}},
-        ]
-    ),
-
-    ], ids=['stop', 'cleanup', 'purge', 'restart'])
+        ], None)
+    ), (
+        dummy_modify_init_order_list,
+        'build', ([{'x2_with_build': {'command': 'build'}}], None)
+    ), (
+        dummy_modify_init_order_list,
+        'create', ([
+            {'x1_without_build': {'command': 'create'}},
+            {'x2_with_build': {'command': 'create'}},
+            ], None)
+    ), (
+        # TODO: 1. add unit command,
+        # 2. add environment substitutions
+        # 3. add test_collector unit
+        # 4. add unit_name and test_file substitutions
+        # 5. add try_always
+        dummy_modify_init_order_list,
+        'test', (
+            test_start1 + test_collection + test_remove_container1,
+            {})
+    ), (
+        dummy_modify_init_order_list,
+        'test:full', (
+            test_start2 + test_collection + test_remove_container2,
+            {})
+    ), (
+        dummy_modify_init_order_list,
+        'test:production', (
+            test_collection, {})
+    ), (
+        dummy_modify_init_order_list,
+        'backup', (
+            {'x1_without_build': {
+                'command': 'backup',
+                'backup_dir': '{{BACKUPDIR}}/{{TIMESTAMP}}',
+                'backup_name': 'x1_without_build'
+            }},
+            {'x2_with_build': {
+                'command': 'backup',
+                'backup_dir': '{{BACKUPDIR}}/{{TIMESTAMP}}',
+                'backup_name': 'x2_with_build'
+            }}, None)
+    ), (
+        dummy_modify_init_order_list,
+        'restore', (
+            {'x1_without_build': {
+                'command': 'restore',
+                'restore_dir': '{{BACKUPDIR}}/{{TIMESTAMP}}',
+                'restore_name': 'x1_without_build'
+            }},
+            {'x2_with_build': {
+                'command': 'restore',
+                'restore_dir': '{{BACKUPDIR}}/{{TIMESTAMP}}',
+                'restore_name': 'x2_with_build'
+            }}, None)
+    )
+    ],
+    ids=[
+        'stop', 'cleanup', 'purge', 'restart', 'build', 'create',
+        'test', 'testfull', 'testproduction', 'backup', 'restore',
+    ])
 def test_modify_order_list(init, command, expected):
 
     configurations = {
         'x1_without_build': {},
         'x2_with_build': {'build': {'tag': 'test'}},
     }
-#        'x3': {},
-#        'x4': {}}
 
-    assert modify_order_list(configurations, init, command) == expected
+    new_configurations, new_order = modify_order_list(
+        configurations, init, command)
+
+    expected_order, expected_configurations = expected
+    if expected_configurations:
+        assert new_configurations == expected_configurations
+    else:
+        assert new_configurations == configurations
+
+    assert new_order == expected_order
 
 
 def test_list_units(test_init):
@@ -189,16 +309,65 @@ def test_list_units(test_init):
     assert set(c.list_units(False)).intersection(some_units) == some_units
 
 
+# - add_argument:
+#     name: '--language'
+#     short: '-l'
+#     choices: ['python', 'node']
+#     default: 'python'
+#     help: 'language of the host container'
+# - add_argument:
+#     name: 'command'
+#     choices: ['initialize', 'exec', 'host-exec', 'bash', 'daemon', 'single',
+#     'upgrade']
+#     default: 'initialize'
+#     help: 'define what to do with the container'
+# - add_argument:
+#     name: 'args'
+#     nargs: argparse.REMAINDER
+def test_environment_argparser(test_init):
+    """
+    checks that the environment argparser is initialized from an environment
+    """
+    pass
+
+
+def test_list_variants_complex(test_init):
+    """
+    checks that the variants are shown correctly for a combination of test and
+    tagged variant definitions.
+    """
+
+
+@pytest.mark.current
+def test_list_variants(test_init):
+    c, etcdir = test_init
+
+    testvariants = set(
+        ['dev_servers/test:{}'.format(n)
+         for n in ['full', 'start_stop', 'production']])
+
+    assert c.list_variants('dev_servers/test') == testvariants
+
+
+@pytest.mark.current
 def test_list_unit_commands(test_init):
     c, etcdir = test_init
 
-    some_units = set([
+    # check that all of these are available
+    dev_server_units = set([
         'dev_servers/start',
         'dev_servers/backup',
         'dev_servers/restore',
         'dev_servers/stop',
         'dev_servers/cleanup',
         'dev_servers/purge',
+        'dev_servers/restart',
+        'dev_servers/build',
+        'dev_servers/create',
+        'dev_servers/test',
+        ])
+
+    some_units = dev_server_units.union(set([
         'nginx_server/start',
         'nginx_server/stop',
         'nginx_server/cleanup',
@@ -209,7 +378,11 @@ def test_list_unit_commands(test_init):
         'selenium/purge',
         'selenium/firefox',
         'selenium/chrome',
-        ])
+        ]))
+
+    found_dev_server_units = [
+        u for u in c.list_units() if u.startswith('dev_servers/')]
+    assert set(found_dev_server_units) == dev_server_units
     assert set(c.list_units()).intersection(some_units) == some_units
 
 

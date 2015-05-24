@@ -226,6 +226,12 @@ class TestWithDockerDaemon(object):
 
         assert os.path.exists(str(tmpdir.join('backup.tar.gz')))
 
+        container.backup(None, str(tmpdir), 'backup2')
+
+        backup2path = str(tmpdir.join('backup2.tar.gz'))
+        assert os.path.exists(backup2path)
+        os.system('gunzip {}'.format(backup2path))
+
         container.manipulate_volumes(
             command=['rm', '/data/empty_file']
         )
@@ -235,14 +241,15 @@ class TestWithDockerDaemon(object):
 
         assert last_info_line(3)[0].endswith("Output follows")
 
-        container.restore(str(tmpdir), 'backup')
+        for b, e in [('backup', '.gz'), ('backup2', '')]:
+            container.restore(str(tmpdir), b)
 
-        assert os.path.exists(str(tmpdir.join('backup.tar.gz')))
+            assert os.path.exists(str(tmpdir.join('{}.tar{}'.format(b, e))))
 
-        container.manipulate_volumes(
-            command=['ls', '/data/'])
+            container.manipulate_volumes(
+                command=['ls', '/data/'])
 
-        assert last_info_line(3)[0] == "empty_file"
+            assert last_info_line(3)[0] == "empty_file"
 
     @pytest.mark.parametrize(
         'tarname',
@@ -728,5 +735,18 @@ def test_creation_manipulation():
 
     dc = DockerContainer(None, 'test', startup=startup)
     assert set(dc.creation['ports']) == set(ports)
+
+
+def test_statistics():
+    """
+    checks that the runtime statistics (junits) are collected correctly.
+    """
+
+
+def test_unit():
+    """
+    checks that the unit command works, executing a unit and collecting
+    information about it (logs / errors / statistics)
+    """
 
 # vim:set ft=python sw=4 et spell spelllang=en:
