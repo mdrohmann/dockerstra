@@ -65,7 +65,7 @@ def main_run(config, args):
             environment.update(new_env)
 
     # transform the unitcommand to a configfile here
-    unit, command = args.unitcommand.rsplit('/', 1)
+    unit, command = config.split_unit_command(args.unitcommand)
     configfile = config.get_abspath(
         os.path.join('units', unit, '{}.yaml'.format(command)))
     if configfile:

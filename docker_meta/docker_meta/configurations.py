@@ -332,6 +332,9 @@ class Configuration(object):
                 environment = deepupdate(environment, env)
         return environment
 
+    def split_unit_command(self, unitcommand):
+        return unitcommand.rsplit('/', 1)
+
     def list_units(self, list_commands=True):
         units_base_path = self.get_abspath('units')
         res = []
