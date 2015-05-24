@@ -5,7 +5,6 @@ import uuid
 from argparse import Namespace
 from io import BytesIO
 
-import docker
 import pytest
 import yaml
 
@@ -136,6 +135,7 @@ def test_main_fail(tmpdir):
         "Maybe you need to run the 'init' command")
 
 
+@pytest.needs_docker_client
 class TestWithDockerDaemon(object):
     cli = None
     uid = None
@@ -146,7 +146,7 @@ class TestWithDockerDaemon(object):
     @classmethod
     def setup_class(cls):
         try:
-            cls.cli = docker.Client('172.17.42.1:4243')
+            cls.cli = pytest.docker_client
             assert cls.cli.images()
         except:
             pytest.xfail(
@@ -255,6 +255,7 @@ class TestWithDockerDaemon(object):
         assert not container.get_image('non-existent')
 
     @pytest.mark.slowtest
+    @pytest.needs_internet
     def test_pull_remove(self):
         container = DockerContainer(
             self.cli, self.testcontainer, {'image': 'hello-world'})
