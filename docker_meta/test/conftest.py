@@ -7,6 +7,12 @@ from docker_meta.container import get_docker_client
 
 
 def internet_on():
+    """
+    tests if an internet connection is available.
+
+    This is copied from
+    http://stackoverflow.com/questions/3764291/checking-network-connection.
+    """
     try:
         urllib2.urlopen('http://216.58.216.174', timeout=1)
         return True
