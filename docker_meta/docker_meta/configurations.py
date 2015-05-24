@@ -131,6 +131,8 @@ def environment_substutions(fh, buf, environment={}):
 def modify_order_list(configurations, order_list, command):
     # return builds, creations and starts:
 
+    new_configurations = configurations
+
     def _parse(configurations, order_list):
         builds, creations, starts = [], [], []
         for item in order_list:
@@ -171,7 +173,7 @@ def modify_order_list(configurations, order_list, command):
     if command == 'purge':
         for built in reversed(builds):
             new_order_list.append({built: {'command': 'remove_image'}})
-    return new_order_list
+    return new_configurations, new_order_list
 
 
 def read_configuration(configfile, environment={}):

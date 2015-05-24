@@ -77,7 +77,7 @@ def main_run(config, args):
         if configfile:
             configurations, order_list = read_configuration(
                 configfile, environment)
-            order_list = modify_order_list(
+            configurations, order_list = modify_order_list(
                 configurations, order_list, command)
         else:
             raise RuntimeError(
@@ -582,5 +582,6 @@ def run_configuration(
                 "Invalid command {} for container {}".format(cmd, name))
 
         time.sleep(wait_time)
+
 
 # vim:set ft=python sw=4 et spell spelllang=en:
