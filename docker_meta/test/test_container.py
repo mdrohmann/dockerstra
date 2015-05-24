@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import time
 import uuid
 from argparse import Namespace
@@ -187,18 +188,34 @@ class TestWithDockerDaemon(object):
 
     @pytest.mark.slowtest
     def test_container_backup_restore(self, tmpdir):
-        configure_logger(test=True, verbosity=1)
+        """
+        This test also tests the manipulate_volumes() function extensively!
+        """
+        configure_logger(test=True, verbosity=1, debug=1)
         container = DockerContainer(
             self.cli, self.testcontainer, {}, {}, self.build_instructions())
         container.create()
+
+        def _get_busybox_id():
+            pattern = re.compile(
+                'busybox container with id (?P<id>[A-Ha-h0-9]*)')
+            res = pattern.findall('\n'.join(last_info_line(10)))
+            return res[-1]
 
         with pytest.raises(RuntimeError) as e:
             container.manipulate_volumes(command=['false'])
         assert 'failed with exit code' in str(e.value)
 
+        # check that container is removed after failed run
+        assert not self.cli.containers(
+            quiet=True, all=True, filters={'id': _get_busybox_id()})
+
         container.manipulate_volumes(
             command=['touch', '/data/empty_file']
         )
+        # check that container is removed after successful run
+        assert not self.cli.containers(
+            quiet=True, all=True, filters={'id': _get_busybox_id()})
 
         container.manipulate_volumes(
             command=['ls', '/data/'])

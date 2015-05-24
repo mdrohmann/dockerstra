@@ -392,6 +392,10 @@ class DockerContainer(object):
             detach=False,
             command=command)
 
+        log.debug(
+            'manipulate_volumes created a busybox container with id {}.'
+            .format(info['Id']))
+
         self.dc.start(
             info,
             volumes_from=self.name,
@@ -402,17 +406,21 @@ class DockerContainer(object):
         stdout = self.dc.logs(info)
 
         info_line = (
-            'Executing command {} on container {}.  Output follows\n{}'
+            'Executing command {} on file system of container {}.  '
+            'Output follows\n{}'
             .format(command, self.name, stdout))
         self._log_output(info_line, 'manipulate_volumes')
 
         if exit_code != 0:
             stderr = self.dc.logs(info, stdout=False, stderr=True, tail=3)
+
+        self.dc.remove_container(info)
+
+        if exit_code != 0:
             raise RuntimeError(
                 "Manipulation of volume {} failed with exit code {}:\n{}"
                 .format(command, exit_code, stderr))
 
-        self.dc.remove_container(info)
         log.info(
             "Successfully executed command {} in container {}."
             .format(command, self.name))
