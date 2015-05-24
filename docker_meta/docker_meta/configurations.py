@@ -350,11 +350,12 @@ class Configuration(object):
             elif os.path.splitext(f)[1] == '.yaml':
                 fres = set(os.path.splitext(f)[0] + '/start')
 
-            if (f + '/start') in fres:
-                fres = fres.union(set(
-                    [f + '/' + n for n in [
-                        'stop', 'restart', 'cleanup', 'purge']]))
             if list_commands:
+                if (f + '/start') in fres:
+                    fres = fres.union(set(
+                        [f + '/' + n for n in [
+                            'stop', 'restart', 'cleanup', 'purge',
+                            'test', 'build', 'create']]))
                 res += list(fres)
             elif fres:
                 res.append(f)
