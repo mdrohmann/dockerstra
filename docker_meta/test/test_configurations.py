@@ -19,13 +19,33 @@ from docker_meta.logger import (
     ('list --units', {
         'subparser': 'list',
         'units': True,
-        })])
+        }),
+    ('init', {
+        'subparser': 'init',
+        }),
+    ('help --unit dev_server', {
+        'subparser': 'help',
+        'unit': 'dev_server'
+        }),
+    ],
+    ids=['run', 'list', 'init', 'help'])
 def test_parser(cmdline, expect):
     parser = create_parser()
     args = parser.parse_args(cmdline.split(' '))
     for k, v in expect.iteritems():
         assert hasattr(args, k)
         assert getattr(args, k) == v
+
+
+@pytest.mark.parametrize('cmdline', [
+    'help',
+    'help --unit',
+    'help --unit u --service s',
+    ])
+def test_parser_fail(cmdline):
+    parser = create_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(cmdline.split(' '))
 
 
 def test_basedir(tmpdir, monkeypatch):
@@ -159,6 +179,17 @@ def test_modify_order_list(init, command, expected):
 
 
 def test_list_units(test_init):
+    c, etcdir = test_init
+
+    some_units = set([
+        'dev_servers',
+        'nginx_server',
+        'selenium',
+        ])
+    assert set(c.list_units(False)).intersection(some_units) == some_units
+
+
+def test_list_unit_commands(test_init):
     c, etcdir = test_init
 
     some_units = set([

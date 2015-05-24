@@ -13,7 +13,7 @@ import docker_meta
 from docker_meta.configurations import (
     read_configuration, Configuration)
 from docker_meta.container import (
-    DockerContainer, run_configuration, main_run, main)
+    DockerContainer, run_configuration, main_run, main_help, main)
 from docker_meta.logger import (
     configure_logger, last_info_line, last_error_line)
 
@@ -29,6 +29,25 @@ CMD /bin/sh -c 'echo hello world; sleep 10'
 
 configure_logger(test=True, verbosity=1)
 log = logging.getLogger(docker_meta.__name__)
+
+
+def test_main_help(tmpdir, capsys):
+    doc = '''
+Test
+====
+'''
+    dir1 = tmpdir.join('units').join('test').ensure_dir()
+    dir1.join('readme.rst').write(doc)
+    dir2 = tmpdir.join('services').join('test').ensure_dir()
+    dir2.join('readme.rst').write(doc)
+    config = Configuration(str(tmpdir))
+    args = Namespace(unit='test', service='test')
+    main_help(config, args)
+    out, _ = capsys.readouterr()
+    assert out == "{}\n{}\n".format(doc, doc)
+    args = Namespace(unit='nonexistent', service=None)
+    main_help(config, args)
+    assert 'Could not find a README file in ' in last_error_line()[0]
 
 
 @pytest.mark.parametrize('unitcommand,env,error', [
@@ -90,10 +109,13 @@ def test_main_init(tmpdir, monkeypatch):
     return tmpdir
 
 
-@pytest.mark.parametrize('subcommand', ['run', 'list'])
+@pytest.mark.parametrize('subcommand', ['run', 'list', 'help'])
 def test_main_other(test_main_init, monkeypatch, subcommand):
     tmpdir = test_main_init
     events = []
+    monkeypatch.setattr(
+        docker_meta.container, 'main_help',
+        lambda *args, **kwargs: events.append('help'))
     monkeypatch.setattr(
         docker_meta.container, 'main_run',
         lambda *args, **kwargs: events.append('run'))

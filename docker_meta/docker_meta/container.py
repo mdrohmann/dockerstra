@@ -20,6 +20,39 @@ def get_docker_client(daemon):
     return docker.Client(daemon)
 
 
+def _check_for_and_print_readme(root, directory):
+    readme_options = [
+        'README.rst',
+        'readme.rst',
+        'README',
+        'README.md',
+        'readme.md',
+    ]
+
+    base = os.path.join(root, directory)
+
+    for candidate in readme_options:
+        fp = os.path.join(base, candidate)
+        if os.path.exists(fp):
+            break
+
+    if os.path.exists(fp):
+        with open(fp, 'r') as fh:
+            print fh.read()
+    else:
+        log.warn('Could not find a README file in {}'.format(base))
+
+
+def main_help(config, args):
+
+    if args.unit:
+        _check_for_and_print_readme(
+            config.get_abspath('units'), args.unit)
+    if args.service:
+        _check_for_and_print_readme(
+            config.get_abspath('services'), args.service)
+
+
 def main_run(config, args):
 
     dc = get_docker_client(args.daemon)
@@ -96,6 +129,8 @@ def main(args):
                 )
         if args.subparser == 'run':
             main_run(config, args)
+        elif args.subparser == 'help':
+            main_help(config, args)
         elif args.subparser == 'list':
             main_list(config, args)
 

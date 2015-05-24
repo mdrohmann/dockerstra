@@ -11,22 +11,34 @@ import yaml
 from jinja2 import Environment, PackageLoader
 from pkg_resources import get_provider, resource_stream
 
-from docker_meta import __name__ as docker_meta_name
-from docker_meta import __version__ as docker_meta_version
+from docker_meta import (
+    __name__ as docker_meta_name, __version__ as docker_meta_version)
 from docker_meta.utils import deepupdate
 
 
 log = logging.getLogger(docker_meta_name)
 
 
-def unitListCompleter(prefix, parsed_args, **kwargs):
+class UnitListCompleter(object):
+
+    def __init__(self, showCommands=True):
+        self.showCommands = showCommands
+
+    def complete(self, prefix, parsed_args, **kwargs):
+        c = Configuration(parsed_args.configdir)
+        return [
+            s for s in c.list_units(self.showCommands) if s.startswith(prefix)]
+
+
+def serviceListCompleter(prefix, parsed_args, **kwargs):
     c = Configuration(parsed_args.configdir)
-    return [s for s in c.list_units() if s.startswith(prefix)]
+    return [
+        s for s in c.list_services() if s.startswith(prefix)]
 
 
 def create_parser():
     parser = argparse.ArgumentParser(
-        "docker_start.py")
+        "docker_start.py", add_help=True)
 
     parser.add_argument(
         '-V', '--version', action='version',
@@ -61,7 +73,8 @@ def create_parser():
         help='socket for daemon connection')
     run_group.add_argument(
         'unitcommand', metavar="UNIT/COMMAND",
-        help='The unit command to run').completer = unitListCompleter
+        help='The unit command to run'
+    ).completer = UnitListCompleter().complete
     run_group.add_argument(
         '--print-only', action='store_true',
         help='Print the parsed unit command file to stdout.')
@@ -72,6 +85,17 @@ def create_parser():
     list_group.add_argument(
         '--services', action='store_true',
         help='List available service files')
+    help_group = subparsers.add_parser(
+        'help', help='Show help on services or units')
+    help_choice = help_group.add_mutually_exclusive_group(required=True)
+    help_choice.add_argument(
+        '--unit', metavar='UNIT', type=str,
+        help='unit for which a help text should be shown'
+    ).completer = UnitListCompleter(False).complete
+    help_choice.add_argument(
+        '--service', metavar='SERVICE', type=str,
+        help='service for which a help text should be shown'
+    ).completer = serviceListCompleter
     return parser
 
 
@@ -308,23 +332,29 @@ class Configuration(object):
                 environment = deepupdate(environment, env)
         return environment
 
-    def list_units(self):
+    def list_units(self, list_commands=True):
         units_base_path = self.get_abspath('units')
         res = []
         for f in os.listdir(units_base_path):
             fullf = os.path.join(units_base_path, f)
             if os.path.isdir(fullf):
-                fres = set([
-                    f + '/' + os.path.splitext(n)[0] for n in os.listdir(
+                pre_filtered = [
+                    n for n in os.listdir(
                         os.path.join(units_base_path, f))
-                    if os.path.splitext(n)[1] == '.yaml'])
-                if (f + '/start') in fres:
-                    fres = fres.union(set(
-                        [f + '/' + n for n in [
-                            'stop', 'restart', 'cleanup', 'purge']]))
-                res += list(fres)
+                    if os.path.splitext(n)[1] == '.yaml']
+                fres = set([
+                    f + '/' + os.path.splitext(n)[0] for n in pre_filtered])
             elif os.path.splitext(f)[1] == '.yaml':
-                res.append(os.path.splitext(f)[0])
+                fres = set(os.path.splitext(f)[0] + '/start')
+
+            if (f + '/start') in fres:
+                fres = fres.union(set(
+                    [f + '/' + n for n in [
+                        'stop', 'restart', 'cleanup', 'purge']]))
+            if list_commands:
+                res += list(fres)
+            elif fres:
+                res.append(f)
         return res
 
     def list_services(self):
@@ -338,6 +368,5 @@ class Configuration(object):
                 res.append(f)
 
         return res
-
 
 # vim:set ft=python sw=4 et spell spelllang=en:
