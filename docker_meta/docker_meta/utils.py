@@ -1,5 +1,10 @@
 import collections
+import datetime
 import os
+
+
+def get_timestamp():
+    return datetime.now().strftime('%Y%m%d-%H%M')
 
 
 def deepupdate(d, u):

@@ -254,30 +254,30 @@ test_configurations2 = {
             test_collection, {})
     ), (
         dummy_modify_init_order_list,
-        'backup', (
+        'backup', ([
             {'x1_without_build': {
                 'command': 'backup',
-                'backup_dir': '{{BACKUPDIR}}/{{TIMESTAMP}}',
+                'backup_dir': 'BACKUPDIR',
                 'backup_name': 'x1_without_build'
             }},
             {'x2_with_build': {
                 'command': 'backup',
-                'backup_dir': '{{BACKUPDIR}}/{{TIMESTAMP}}',
+                'backup_dir': 'BACKUPDIR',
                 'backup_name': 'x2_with_build'
-            }}, None)
+            }}], None)
     ), (
         dummy_modify_init_order_list,
-        'restore', (
+        'restore', ([
             {'x1_without_build': {
                 'command': 'restore',
-                'restore_dir': '{{BACKUPDIR}}/{{TIMESTAMP}}',
+                'restore_dir': 'BACKUPDIR',
                 'restore_name': 'x1_without_build'
             }},
             {'x2_with_build': {
                 'command': 'restore',
-                'restore_dir': '{{BACKUPDIR}}/{{TIMESTAMP}}',
+                'restore_dir': 'BACKUPDIR',
                 'restore_name': 'x2_with_build'
-            }}, None)
+            }}], None)
     )
     ],
     ids=[
@@ -287,6 +287,8 @@ test_configurations2 = {
 def test_modify_order_list(test_init, init, command, expected):
 
     c, etcdir = test_init
+
+    c.environment['BACKUPDIR'] = 'BACKUPDIR'
 
     configurations = {
         'x1_without_build': {},
@@ -302,7 +304,18 @@ def test_modify_order_list(test_init, init, command, expected):
     else:
         assert new_configurations == configurations
 
-    assert new_order == expected_order
+    assert len(new_order) == len(expected_order)
+
+    def _rearrange(order):
+        new = dict([])
+        for item in order:
+            k, v = item.items()[0]
+            if k not in new:
+                new[k] = set([])
+            new[k].add(repr(v))
+        return new
+
+    assert (_rearrange(new_order) == _rearrange(expected_order))
 
 
 def test_list_units(test_init):

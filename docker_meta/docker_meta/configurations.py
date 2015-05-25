@@ -251,22 +251,23 @@ class Configuration(object):
 
     def modify_order_list(self, configurations, order_list, command):
         # return builds, creations and starts:
+        # TODO: filter variants....
 
         new_configurations = configurations
 
         def _parse(configurations, order_list):
-            builds, creations, starts = [], [], []
+            builds, creations, starts = set([]), set([]), set([])
             for item in order_list:
                 name, order = item.items()[0]
                 cmd = order['command']
                 if cmd == 'start':
-                    starts.append(name)
+                    starts.add(name)
                 if cmd in ['start', 'create']:
-                    creations.append(name)
+                    creations.add(name)
                 if cmd in ['start', 'build', 'create']:
                     build_config = configurations[name].get('build', {})
                     if build_config.get('tag'):
-                        builds.append(name)
+                        builds.add(name)
             return builds, creations, starts
 
         builds, creations, starts = _parse(configurations, order_list)
@@ -278,22 +279,45 @@ class Configuration(object):
         elif command == 'purge':
             remove_order = {'command': 'remove', 'v': True}
 
-        if command == 'restart':
-            for started in reversed(starts):
+        if command == 'build':
+            for build in builds:
+                new_order_list.append({
+                    build:
+                        {'command': 'build'}})
+        elif command == 'create':
+            for created in creations:
+                new_order_list.append({
+                    created:
+                        {'command': 'create'}})
+
+        elif command == 'restart':
+            for started in starts:
                 new_order_list.append(
                     {started:
                         {'command': 'start', 'restart': True, 'timeout': 0}})
+        if command == 'backup':
+            for created in creations:
+                new_order_list.append(
+                    {created:
+                        {'command': 'backup',
+                         'backup_dir': self.environment.get('BACKUPDIR'),
+                         'backup_name': created}})
+        if command == 'restore':
+            for created in creations:
+                new_order_list.append(
+                    {created:
+                        {'command': 'restore',
+                         'restore_dir': self.environment.get('BACKUPDIR'),
+                         'restore_name': created}})
         if command in ['stop', 'cleanup', 'purge']:
-            for started in reversed(starts):
+            for started in starts:
                 new_order_list.append({started: copy(stop_command)})
         if command in ['cleanup', 'purge']:
-            for started in reversed(starts):
-                new_order_list.append({started: copy(remove_order)})
-            for created in reversed(creations):
+            for created in creations:
                 new_order_list.append({created: copy(remove_order)})
 
         if command == 'purge':
-            for built in reversed(builds):
+            for built in builds:
                 new_order_list.append({built: {'command': 'remove_image'}})
         return new_configurations, new_order_list
 

@@ -387,7 +387,6 @@ class TestWithDockerDaemon(object):
             container.start(attach=True)
             assert 'hello world' in last_info_line()[0]
 
-
         # Do it twice, to see that there are no errors the second time.
         container.start()
 
@@ -455,7 +454,7 @@ default_events = [
     ('restore', ['x1', os.getcwd(), 'testbackup']), 0,
     ('stop', ['x1', 3]), 0,
     ('remove', ['x1', False, 10]), 0,
-    ('backup', ['x2', '/', os.getcwd(), 'backup', False]), 0,
+    ('backup', ['x2', None, os.getcwd(), 'backup', False]), 0,
     ('restore', ['x2', os.getcwd(), 'backup']), 0,
     ('execute', ['x2', ['rm', '/var/cache'], False, {}]), 0,
     ('execute', ['host', ['echo', 'hallo'], True, {}]), 0,
