@@ -28,7 +28,9 @@ class UnitExtensionLoader(BaseLoader):
     def get_source(self, environment, template):
         path = os.path.join(self.path, template, 'extensions.yaml')
         if not os.path.exists(path):
-            raise TemplateNotFound(template)
+            raise TemplateNotFound(
+                "Looked for {}/extensions.yaml in {}"
+                .format(template, self.path))
         mtime = os.path.getmtime(path)
         with file(path) as f:
             source = f.read().decode('utf-8')

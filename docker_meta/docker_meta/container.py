@@ -116,6 +116,11 @@ def main(args):
         elif args.subparser == 'list':
             main_list(config, args)
 
+    except SystemExit as e:
+        if e.code == 0:
+            pass
+        else:
+            log.error("Exited with error code: {}".format(e.code))
     except:
         log.error("Failed to execute the recipe.", exc_info=1)
 
