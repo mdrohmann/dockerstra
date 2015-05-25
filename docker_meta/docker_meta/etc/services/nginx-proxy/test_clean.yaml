@@ -1,4 +1,4 @@
-import: test_configuration.yaml
+import: nginx-proxy/test_configuration
 ---
 -
     nginx_proxy:

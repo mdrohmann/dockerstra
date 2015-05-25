@@ -2,13 +2,13 @@
 import argparse
 import logging
 import os
-import re
 import sys
-from cStringIO import StringIO
 from tempfile import TemporaryFile
 
 import yaml
-from jinja2 import Environment, PackageLoader
+from jinja2 import (
+    Environment, PackageLoader, BaseLoader, ChoiceLoader, FileSystemLoader,
+    TemplateNotFound)
 from pkg_resources import get_provider, resource_stream
 
 from docker_meta import (
@@ -17,6 +17,28 @@ from docker_meta.utils import deepupdate
 
 
 log = logging.getLogger(docker_meta_name)
+
+
+class UnitExtensionLoader(BaseLoader):
+
+    def __init__(self, path):
+        self.path = path
+
+    def get_source(self, environment, template):
+        path = os.path.join(self.path, template, 'extensions.yaml')
+        if not os.path.exists(path):
+            raise TemplateNotFound(template)
+        mtime = os.path.getmtime(path)
+        with file(path) as f:
+            source = f.read().decode('utf-8')
+        return source, path, lambda: mtime == os.path.getmtime(path)
+
+    def list_templates(self):
+        templates = set(
+            [p for p in os.listdir(self.path)
+             if os.path.exists(os.path.join(p, 'extensions.yaml'))]
+        )
+        return sorted(templates)
 
 
 class UnitListCompleter(object):
@@ -78,6 +100,9 @@ def create_parser():
     run_group.add_argument(
         '--print-only', action='store_true',
         help='Print the parsed unit command file to stdout.')
+    run_group.add_argument(
+        'args', nargs=argparse.REMAINDER,
+        help='arguments send as command to the docker containers')
     list_group = subparsers.add_parser('list', help='list certain things')
     list_group.add_argument(
         '--units', action='store_true',
@@ -97,119 +122,6 @@ def create_parser():
         help='service for which a help text should be shown'
     ).completer = serviceListCompleter
     return parser
-
-
-def _substitute_line(pattern, s, environment):
-    substituted = False
-    for res in reversed(list(pattern.finditer(s))):
-        key = res.group()[2:-2].strip()
-        value = os.getenv(key, environment.get(key))
-        if value:
-            substituted = True
-            s = s[:res.start()] + value + s[res.end():]
-            log.debug(
-                "substituting {} with {}:\n{}".format(key, value, s))
-        else:
-            log.warn(
-                "Could not find a substitution for {}:\n{}".format(key, s))
-
-    if substituted:
-        s = _substitute_line(pattern, s, environment)
-
-    return s
-
-
-def environment_substutions(fh, buf, environment={}):
-    pattern = re.compile(r'({{[^}]*}})')
-    for s in fh.readlines():
-        s = _substitute_line(pattern, s, environment)
-        buf.write(s)
-
-    buf.seek(0)
-
-
-def modify_order_list(configurations, order_list, command):
-    # return builds, creations and starts:
-
-    new_configurations = configurations
-
-    def _parse(configurations, order_list):
-        builds, creations, starts = [], [], []
-        for item in order_list:
-            name, order = item.items()[0]
-            cmd = order['command']
-            if cmd == 'start':
-                starts.append(name)
-            elif cmd == 'create':
-                creations.append(name)
-            elif cmd == 'build':
-                build_config = configurations[name].get('build', {})
-                if build_config.get('tag'):
-                    builds.append(name)
-        return builds, creations, starts
-
-    builds, creations, starts = _parse(configurations, order_list)
-    new_order_list = []
-
-    stop_command = {'command': 'stop', 'timeout': 0}
-    if command == 'cleanup':
-        remove_order = {'command': 'remove', 'v': False}
-    elif command == 'purge':
-        remove_order = {'command': 'remove', 'v': True}
-
-    if command == 'restart':
-        for started in reversed(starts):
-            new_order_list.append(
-                {started: {'command': 'start', 'restart': True, 'timeout': 0}})
-    if command in ['stop', 'cleanup', 'purge']:
-        for started in reversed(starts):
-            new_order_list.append({started: stop_command})
-    if command in ['cleanup', 'purge']:
-        for started in reversed(starts):
-            new_order_list.append({started: remove_order})
-        for created in reversed(creations):
-            new_order_list.append({created: remove_order})
-
-    if command == 'purge':
-        for built in reversed(builds):
-            new_order_list.append({built: {'command': 'remove_image'}})
-    return new_configurations, new_order_list
-
-
-def read_configuration(configfile, environment={}):
-    if isinstance(environment, basestring):
-        if environment:
-            with open(environment, 'r') as fh:
-                environment = yaml.load(fh)
-        else:
-            environment = {}
-
-    buf = StringIO()
-    with open(configfile, 'r') as fh:
-        environment_substutions(fh, buf, environment)
-
-    configs = yaml.load_all(buf)
-    configs = list(configs)
-
-    order_list = configs[1]
-    configurations = configs[0]
-    configdir = os.path.abspath(os.path.dirname(configfile))
-    if 'import' in configurations:
-        imported = {}
-        importfiles = configurations.pop('import')
-        if isinstance(importfiles, basestring):
-            importfiles = [importfiles]
-
-        for importfile in importfiles:
-            parent_file = os.path.join(configdir, importfile)
-            tmp_imported, _ = read_configuration(
-                parent_file, environment)
-            imported.update(tmp_imported)
-
-        imported.update(configurations)
-        configurations = imported
-
-    return configurations, order_list
 
 
 def silent_mkdirs(dirs):
@@ -245,12 +157,173 @@ class Configuration(object):
         ('/etc', 'dockerstra')
         ]
 
-    def __init__(self, basedir=None):
+    def __init__(self, basedir=None, args=[]):
         self.basedir = self._guess_basedir(basedir)
         log.debug('Using configuration directory {}'.format(self.basedir))
         self.initialized = self._isinitialized()
         provider = get_provider(docker_meta_name)
         self.provider = provider
+        self._environment = None
+        self.args = args
+
+    def update_environment(self, filename):
+        self.environment.update(self._get_environment())
+        if filename:
+            with open(filename, 'r') as fh:
+                new_env = yaml.load(fh)
+            self.environment.update(new_env)
+        self.environment.update(os.environ)
+
+    @property
+    def environment(self):
+        if self._environment:
+            return self._environment
+        else:
+            self._environment = self._get_environment()
+            return self._environment
+
+    def get_unit_globals(self, unit):
+        candidate = os.path.join(unit, 'globals')
+        configfile = self.get_abspath(
+            os.path.join('units', '{}.yaml'.format(candidate)))
+        if configfile:
+            # do an environment substitution without globals first
+            buf = self.unit_substitutions(candidate)
+            return yaml.load(buf)
+        else:
+            return None
+
+    def parse_args(self, global_config):
+        parser = argparse.ArgumentParser()
+        for arg in global_config.get('parser', []):
+            k, v = arg.items()[0]
+            assert k == 'argument'
+            args = [
+                a for a in [v.pop('short', None), v.pop('name', None)] if a]
+            if v.get('nargs', '') == 'argparse.REMAINDER':
+                v['nargs'] = argparse.REMAINDER
+            parser.add_argument(*args, **v)
+        args = parser.parse_args(self.args)
+        return {'args': args.__dict__}
+
+    def unit_substitutions(
+            self, unitcommand, global_config=None):
+
+        extra_environment = {}
+        loader = FileSystemLoader(
+            self.get_abspath(os.path.join('units')))
+
+        if global_config:
+            extra_environment = self.parse_args(global_config)
+
+            if 'jinja' in global_config:
+                macroloader_path = (
+                    global_config['jinja'].get('macroloader_path'))
+                if macroloader_path:
+                    macroloader = UnitExtensionLoader(macroloader_path)
+                    loader = ChoiceLoader([loader, macroloader])
+        env = Environment(loader=loader)
+
+        t = env.get_template('{}.yaml'.format(unitcommand))
+
+        extra_environment.update(self.environment)
+        if global_config:
+            extra_environment.update(global_config.get('environment', {}))
+        return t.render(**extra_environment)
+
+    def get_base_command(self, unit, command):
+        candidate = self.get_abspath(
+            os.path.join('units', unit, '{}.yaml'.format(command)))
+        if candidate:
+            return '{}/{}'.format(unit, command)
+        elif command != 'start':
+            return self.get_base_command(unit, 'start')
+
+        raise RuntimeError(
+            "No configuration found for unit/command tuple {}/{}!"
+            .format(unit, command))
+
+    def modify_order_list(self, configurations, order_list, command):
+        # return builds, creations and starts:
+
+        new_configurations = configurations
+
+        def _parse(configurations, order_list):
+            builds, creations, starts = [], [], []
+            for item in order_list:
+                name, order = item.items()[0]
+                cmd = order['command']
+                if cmd == 'start':
+                    starts.append(name)
+                elif cmd == 'create':
+                    creations.append(name)
+                elif cmd == 'build':
+                    build_config = configurations[name].get('build', {})
+                    if build_config.get('tag'):
+                        builds.append(name)
+            return builds, creations, starts
+
+        builds, creations, starts = _parse(configurations, order_list)
+        new_order_list = []
+
+        stop_command = {'command': 'stop', 'timeout': 0}
+        if command == 'cleanup':
+            remove_order = {'command': 'remove', 'v': False}
+        elif command == 'purge':
+            remove_order = {'command': 'remove', 'v': True}
+
+        if command == 'restart':
+            for started in reversed(starts):
+                new_order_list.append(
+                    {started:
+                        {'command': 'start', 'restart': True, 'timeout': 0}})
+        if command in ['stop', 'cleanup', 'purge']:
+            for started in reversed(starts):
+                new_order_list.append({started: stop_command})
+        if command in ['cleanup', 'purge']:
+            for started in reversed(starts):
+                new_order_list.append({started: remove_order})
+            for created in reversed(creations):
+                new_order_list.append({created: remove_order})
+
+        if command == 'purge':
+            for built in reversed(builds):
+                new_order_list.append({built: {'command': 'remove_image'}})
+        return new_configurations, new_order_list
+
+    def read_unit_configuration(self, unitcommand):
+        unit, command = self.split_unit_command(unitcommand)
+        unit_globals = self.get_unit_globals(unit)
+
+        candidate = self.get_base_command(unit, command)
+
+        buf = self.unit_substitutions(candidate, unit_globals)
+
+        configs = yaml.load_all(buf)
+        configs = list(configs)
+
+        order_list = configs[1]
+        configurations = configs[0]
+        if 'import' in configurations:
+            imported = {}
+            importfiles = configurations.pop('import')
+            if isinstance(importfiles, basestring):
+                importfiles = [importfiles]
+
+            for importfile in importfiles:
+                tmp_imported, _ = self.read_unit_configuration(
+                    importfile)
+                imported.update(tmp_imported)
+
+            imported.update(configurations)
+            configurations = imported
+
+        # automatically generate the configurations from the 'start'-command
+        if candidate != unitcommand:
+            configurations, order_list = self.modify_order_list(
+                configurations, order_list, command)
+
+        return configurations, order_list
 
     def _isinitialized(self, basedir=None):
         if basedir is None:
@@ -332,14 +405,15 @@ class Configuration(object):
         else:
             return None
 
-    def get_environment(self):
+    def _get_environment(self):
         environment = {'DOCKERSTRA_CONF': self.basedir}
         env_base_path = self.get_abspath('environments')
-        for f in os.listdir(env_base_path):
-            filename = os.path.join(env_base_path, f)
-            with open(filename, 'r') as fh:
-                env = yaml.load(fh)
-                environment = deepupdate(environment, env)
+        if env_base_path:
+            for f in os.listdir(env_base_path):
+                filename = os.path.join(env_base_path, f)
+                with open(filename, 'r') as fh:
+                    env = yaml.load(fh)
+                    environment = deepupdate(environment, env)
         return environment
 
     def split_unit_command(self, unitcommand):
@@ -351,25 +425,12 @@ class Configuration(object):
     def list_test_variants(self, base_config):
         raise NotImplementedError()
 
-    def get_base_configfile(self, unit, command):
-        units_base_path = self.get_abspath('units')
-        # check if command file exists explicitly
-        candidate1 = os.path.join(
-            units_base_path, unit, '{}.yaml'.format(command))
-        if os.path.exists(candidate1):
-            return candidate1
-        else:  # check if command exists, and return start file in this case.
-            if '{}/{}'.format(unit, command) in self.list_units():
-                return self.get_base_configfile(unit, 'start')
-
-        return None
-
     def list_variants(self, unitcommand):
         unit, command = self.split_unit_command(unitcommand)
         if command == 'test':
             return self.list_test_variants(unit)
         else:
-            base_config = self.get_base_configfile(unit, command)
+            base_config = self.get_base_command(unit, command)
             if not base_config:
                 raise RuntimeError(
                     "Invalid command: No configuration file for {}/{}"

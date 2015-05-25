@@ -12,7 +12,7 @@
 {%- set entrypoint='["/init", "run"]' -%}
 {%- endif args.command -%}
 {%- set container_name="python_host_{}".format(run_variant) -%}
-{%- import "{}.jinja_macros".format(args.virtualenv) as ext -%}
+{%- import args.virtualenv as ext -%}
 {{container_name}}:
     build:
         path: {{DOCKER_REPO}}/services/python_hosts/{{args.virtualenv}}

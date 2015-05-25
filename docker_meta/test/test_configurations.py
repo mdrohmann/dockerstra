@@ -5,16 +5,16 @@ from argparse import Namespace
 import pytest
 from docker_meta.container import (
     main_list)
-from docker_meta.configurations import (
-    Configuration, create_parser, modify_order_list)
+from docker_meta.configurations import (Configuration, create_parser)
 from docker_meta.logger import (
     configure_logger, last_info_line)
 
 
 @pytest.mark.parametrize('cmdline,expect', [
-    ('run -H 172.17.42.1:4243 --print-only unit/start', {
+    ('run -H 172.17.42.1:4243 --print-only unit/start rest -c -v', {
         'subparser': 'run', 'daemon': '172.17.42.1:4243',
-        'print_only': True, 'unitcommand': 'unit/start'
+        'print_only': True, 'unitcommand': 'unit/start',
+        'args': ['rest', '-c', '-v']
         }),
     ('list --units', {
         'subparser': 'list',
@@ -25,7 +25,7 @@ from docker_meta.logger import (
         }),
     ('help --unit dev_server', {
         'subparser': 'help',
-        'unit': 'dev_server'
+        'unit': 'dev_server',
         }),
     ],
     ids=['run', 'list', 'init', 'help'])
@@ -119,13 +119,17 @@ def test_get_abspath(test_init):
 def test_get_environment(test_init):
     c, etcdir = test_init
 
-    etcdir.join('environments').join('extra.yaml').write('''
-test: 12
-    ''')
+    extra = etcdir.join('other').ensure_dir().join('extra.yaml')
+    extra.write('''other: 42''')
+    etcdir.join('environments').join('extra.yaml').write('''test: 12''')
 
-    env = c.get_environment()
+    c.update_environment(str(extra))
+
+    etcdir.join('environments').join('extra2.yaml').write('''skipped: 12''')
+
+    env = c.environment
     assert set(env.keys()) == set(
-        ['DOCKERSTRA_CONF', 'DOCKER_HOST', 'BACKUP_DIR', 'test'])
+        ['DOCKERSTRA_CONF', 'DOCKER_HOST', 'BACKUP_DIR', 'test', 'other'])
 
 
 dummy_modify_init_order_list = [
@@ -430,5 +434,149 @@ def test_list_services(test_init):
         'gitolite',
         'pypicloud'])
     assert set(c.list_services()).intersection(some_services) == some_services
+
+
+def test_read_configuration(test_init):
+    c, etcdir = test_init
+    unitsdir = etcdir.join('units')
+    testunitdir = unitsdir.join('test').ensure_dir()
+    testyaml = testunitdir.join('start.yaml')
+    testyaml.write("""
+x1: abc
+---
+-
+    x1:
+        command: start
+""")
+    configurations, order_list = c.read_unit_configuration('test/start')
+    expect = {'x1': 'abc'}
+    assert configurations == expect
+    assert order_list == [{'x1': {'command': 'start'}}]
+
+    testyaml2 = testunitdir.join('other.yaml')
+    testyaml2.write("""
+import: test/start
+x2: def
+x1: jkl
+---
+-
+    x1:
+       command: backup
+""")
+    expect2 = {'x1': 'jkl', 'x2': 'def'}
+    configurations, order_list = c.read_unit_configuration('test/other')
+    assert configurations == expect2
+    assert order_list == [{'x1': {'command': 'backup'}}]
+
+    testyaml31 = testunitdir.join('test31.yaml')
+    testyaml31.write("""
+x3: ghi
+---
+""")
+
+    testyaml3 = testunitdir.join('test3.yaml')
+    testyaml3.write("""
+import: ["test/start", "test/test31"]
+---
+-
+    x1:
+       command: backup
+""")
+    expect3 = {'x1': 'abc', 'x3': 'ghi'}
+    configurations, order_list = c.read_unit_configuration('test/test3')
+    assert configurations == expect3
+    assert order_list == [{'x1': {'command': 'backup'}}]
+
+    fooextension = etcdir.join('foo').ensure_dir().join('extensions.yaml')
+    fooextension.write("""{%- set container_name = "x1" -%}""")
+    testyaml4 = testunitdir.join('test4.yaml')
+    testyaml4.write("""
+    {%- include "missing" ignore missing -%}
+    {%- import "foo" as foo -%}
+import: ["{{args.import}}", "{{args.args[0]}}"]
+---
+-
+    {{foo.container_name}}:
+        command: '{{THE_COMMAND}}'
+""")
+    globalconf = testunitdir.join('globals.yaml')
+    globalconf.write("""
+parser:
+    - argument:
+         name: 'import'
+    - argument:
+         name: 'args'
+         nargs: 'argparse.REMAINDER'
+jinja:
+    macroloader_path: {}
+environment:
+    THE_COMMAND: 'backup'
+""".format(str(etcdir)))
+
+    c.args = ['test/start', 'test/test31']
+    configurations, order_list = c.read_unit_configuration('test/test4')
+    assert configurations == expect3
+    assert order_list == [{'x1': {'command': 'backup'}}]
+
+
+def test_environment_substitution(test_init):
+    c, etcdir = test_init
+    testunitdir = etcdir.join('units').join('test').ensure_dir()
+    testyaml = testunitdir.join('start.yaml')
+    os.environ['HOSTNAME'] = 'dummy'
+    envyaml = etcdir.join('environments').join('env.yaml')
+    abc_value = 'hello world'
+    envyaml.write("""
+BASEDIR: """ + str(etcdir) + """
+COMMAND: 'start'
+abc: """ + abc_value)
+
+    c.update_environment('')
+
+    testyaml.write("""
+{{HOSTNAME}}/cgit:
+    build:
+        path: {{BASEDIR}}/services/{{abc}}/cgit
+    startup:
+        binds:
+            ${CONFIG_DIR}/test:
+                bind: /var/test
+                ro: False
+---
+-
+    {{HOSTNAME}}/cgit:
+        command: {{COMMAND}}  # this does not make sense!
+-
+    host:
+        command: exec
+        run:
+            - my_script
+            - "[[.NetworkSettings.IPAddress]]({{HOSTNAME}}/cgit)"
+""")
+    configuration, order_list = c.read_unit_configuration('test/start')
+    c_expected = {
+        'dummy/cgit': {
+            'build': {
+                'path': (
+                    '{}/services/{}/cgit'
+                    .format(str(etcdir), abc_value)
+                ),
+            },
+            'startup': {
+                'binds': {
+                    '${CONFIG_DIR}/test': {'bind': '/var/test', 'ro': False}
+                }
+            }
+        }
+    }
+    ol_expected = [
+        {'dummy/cgit': {'command': 'start'}},
+        {'host': {
+            'command': 'exec',
+            'run': ['my_script', '[[.NetworkSettings.IPAddress]](dummy/cgit)']
+        }}
+    ]
+    assert configuration == c_expected
+    assert order_list == ol_expected
 
 # vim:set ft=python sw=4 et spell spelllang=en:

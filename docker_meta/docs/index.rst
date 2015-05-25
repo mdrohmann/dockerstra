@@ -120,10 +120,10 @@ Alternatively, the first document can simply be of the form:
 
 .. code-block:: yaml
 
-   import: other_file.yaml
+   import: unit/other
 
 in which case the container descriptions are read from the file
-``other_file.yaml``.
+``unit/other.yaml``.
 
 Links
 +++++
