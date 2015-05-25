@@ -434,7 +434,17 @@ class DockerContainer(object):
             "Successfully executed command {} in container {}."
             .format(command, self.name))
 
-    def backup(self, source, target_dir, target_name, overwrite=False):
+    def backup(self, sources, target_dir, target_name, overwrite=False):
+        if not sources:
+            inspect = self.dc.inspect_container(self.name)
+            volumes = inspect['Config']['Volumes']
+            if not volumes:
+                raise RuntimeError(
+                    "No volumes to backup found in container {}"
+                    .format(self.name))
+            sources = volumes.keys()
+        if isinstance(sources, basestring):
+            sources = [sources]
         target_dir = self._path_substitutions(target_dir)
         targetfile = os.path.join(target_dir, '{}.tar'.format(target_name))
         gzipped_target_file = '{}.gz'.format(targetfile)
@@ -448,10 +458,10 @@ class DockerContainer(object):
 
         log.info(
             "Backup of container {}: {} -> {}/{}"
-            .format(self.name, source, target_dir, target_name))
+            .format(self.name, repr(sources), target_dir, target_name))
         res = self.manipulate_volumes(
             command=[
-                'tar', 'cvf', '/backup/{}.tar'.format(target_name), source],
+                'tar', 'cvf', '/backup/{}.tar'.format(target_name)] + sources,
             binds={target_dir: {'bind': '/backup', 'ro': False}})
         os.system('gzip {}.tar'.format(os.path.join(target_dir, target_name)))
         return res
@@ -511,7 +521,7 @@ class DockerContainer(object):
         container = self.get_container()
         if container:
             if not v:
-                inspect = self.dc.inspect_container(self.name)
+                inspect = self.inspect()
                 binds = set([
                     n.split(':')[1] for n in (
                         inspect['HostConfig']['Binds'] or [])])
@@ -570,7 +580,7 @@ def run_configuration(
             container.restore(restore_dir, restore_name)
         elif cmd == 'backup':
             backup_dir = os.path.abspath(orders.get('backup_dir', '.'))
-            source_dir = orders.get('source', '/')
+            source_dir = orders.get('source', None)
             backup_name = orders.get('backup_name', 'backup')
             overwrite = orders.get('overwrite', False)
             container.backup(source_dir, backup_dir, backup_name, overwrite)

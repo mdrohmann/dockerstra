@@ -191,6 +191,16 @@ class TestWithDockerDaemon(object):
             container.start()
 
     @pytest.mark.slowtest
+    def test_container_backup_fail(self, tmpdir):
+        container = DockerContainer(
+            self.cli, self.testcontainer,
+            creation={'image': 'busybox:latest', 'name': self.testcontainer})
+        container.create()
+        with pytest.raises(RuntimeError) as e:
+            container.backup(None, str(tmpdir), 'backup')
+        assert 'No volumes to backup' in str(e.value)
+
+    @pytest.mark.slowtest
     def test_container_backup_restore(self, tmpdir):
         """
         This test also tests the manipulate_volumes() function extensively!
@@ -224,7 +234,7 @@ class TestWithDockerDaemon(object):
         container.manipulate_volumes(
             command=['ls', '/data/'])
 
-        assert last_info_line(3)[0] == "empty_file"
+        assert last_info_line(2)[0] == "empty_file"
 
         container.backup('/data', str(tmpdir), 'backup')
 
@@ -243,7 +253,7 @@ class TestWithDockerDaemon(object):
         container.manipulate_volumes(
             command=['ls', '/data/'])
 
-        assert last_info_line(3)[0].endswith("Output follows")
+        assert last_info_line(2)[0].endswith("Output follows")
 
         for b, e in [('backup', '.gz'), ('backup2', '')]:
             container.restore(str(tmpdir), b)
@@ -253,7 +263,7 @@ class TestWithDockerDaemon(object):
             container.manipulate_volumes(
                 command=['ls', '/data/'])
 
-            assert last_info_line(3)[0] == "empty_file"
+            assert last_info_line(2)[0] == "empty_file"
 
     @pytest.mark.parametrize(
         'tarname',
