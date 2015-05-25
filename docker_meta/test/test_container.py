@@ -124,14 +124,14 @@ def test_main_other(test_main_init, monkeypatch, subcommand):
         lambda *args, **kwargs: events.append('list'))
 
     args = Namespace(
-        configdir=str(tmpdir), subparser=subcommand, environment=None)
+        configdir=str(tmpdir), subparser=subcommand)
     main(args)
     assert events.pop() == subcommand
 
 
 def test_main_fail(tmpdir):
     args = Namespace(
-        configdir=str(tmpdir), subparser='run', environment=None)
+        configdir=str(tmpdir), subparser='run')
     main(args)
 
     assert last_error_line()[0].endswith(

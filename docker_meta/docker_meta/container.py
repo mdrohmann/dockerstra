@@ -98,7 +98,8 @@ def main(args):
     try:
         remainder = getattr(args, 'args', [])
         config = Configuration(args.configdir, remainder)
-        config.update_environment(args.environment)
+        environment = getattr(args, 'environment', None)
+        config.update_environment(environment)
 
         if args.subparser == 'init':
             config.initialize()
