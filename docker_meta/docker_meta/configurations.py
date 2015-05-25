@@ -98,6 +98,9 @@ def create_parser():
         help='The unit command to run'
     ).completer = UnitListCompleter().complete
     run_group.add_argument(
+        '--print-substitutions', action='store_true',
+        help='Print the substituted unit command file to stdout.')
+    run_group.add_argument(
         '--print-only', action='store_true',
         help='Print the parsed unit command file to stdout.')
     run_group.add_argument(
@@ -291,13 +294,15 @@ class Configuration(object):
                 new_order_list.append({built: {'command': 'remove_image'}})
         return new_configurations, new_order_list
 
-    def read_unit_configuration(self, unitcommand):
+    def read_unit_configuration(self, unitcommand, print_substitutions=False):
         unit, command = self.split_unit_command(unitcommand)
         unit_globals = self.get_unit_globals(unit)
 
         candidate = self.get_base_command(unit, command)
 
         buf = self.unit_substitutions(candidate, unit_globals)
+        if print_substitutions:
+            return buf
 
         configs = yaml.load_all(buf)
         configs = list(configs)

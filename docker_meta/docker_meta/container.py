@@ -56,6 +56,10 @@ def main_run(config, args):
 
     dc = get_docker_client(args.daemon)
 
+    if args.print_substitutions:
+        print config.read_unit_configuration(args.unitcommand, True)
+        return
+
     configurations, order_list = config.read_unit_configuration(
         args.unitcommand)
 
