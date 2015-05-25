@@ -1,4 +1,4 @@
-import: start.yaml
+import: selenium/start
 ---
 -
   selenium_hub:

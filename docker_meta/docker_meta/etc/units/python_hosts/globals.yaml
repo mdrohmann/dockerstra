@@ -1,0 +1,31 @@
+parser:
+    - argument:
+        name: 'command',
+        choices: ['initialize', 'upgrade', 'daemon', 'single', 'exec', 'bash']
+        metavar: 'COMMAND'
+        help: 'Command to execute'
+    - argument:
+        name: '--virtualenv'
+        short: '-E'
+        metavar: 'VIRTUALENV'
+        default: 'minimal'
+        help: 'Name of the virtual environment to chooce from'
+    - argument:
+        name: '--no-cleanup'
+        short: '-k'
+        action: 'store_true'
+        help: 'prevents the automatic deletion of the container after it exits'
+    - argument:
+        name: '--extra_name'
+        short: '-x'
+        metavar: 'NAME'
+        default: 'default'
+        help: 'Extra name to append to the container and the virtualenv'
+    - argument:
+        name: 'args',
+        nargs: 'argparse.REMAINDER'
+        help: 'arguments passed as a command to the entrypoint'
+environment:
+    PYTHON_HOSTS: {{DOCKER_REPO}}/hosts/python
+jinja:
+    macroloader_path: {{DOCKER_REPO}}/hosts/python/

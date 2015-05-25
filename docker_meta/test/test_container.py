@@ -1,17 +1,16 @@
 import logging
 import os
+import re
 import time
 import uuid
 from argparse import Namespace
 from io import BytesIO
 
-import docker
 import pytest
 import yaml
 
 import docker_meta
-from docker_meta.configurations import (
-    read_configuration, Configuration)
+from docker_meta.configurations import (Configuration)
 from docker_meta.container import (
     DockerContainer, run_configuration, main_run, main_help, main)
 from docker_meta.logger import (
@@ -55,7 +54,7 @@ Test
     ('dev_servers/restart', False, None),
     ('invalid/start', False, RuntimeError),
 ])
-def test_main_run(tmpdir, monkeypatch, capsys, unitcommand, env, error):
+def test_main_run(tmpdir, monkeypatch, unitcommand, env, error, capsys):
     config = Configuration(str(tmpdir))
     config.initialize()
     events = []
@@ -101,7 +100,8 @@ TEST: 1
 @pytest.fixture
 def test_main_init(tmpdir, monkeypatch):
 
-    args_init = Namespace(configdir=str(tmpdir), subparser='init')
+    args_init = Namespace(
+        configdir=str(tmpdir), subparser='init', environment=None)
     main(args_init)
 
     config = Configuration(str(tmpdir))
@@ -123,19 +123,22 @@ def test_main_other(test_main_init, monkeypatch, subcommand):
         docker_meta.container, 'main_list',
         lambda *args, **kwargs: events.append('list'))
 
-    args = Namespace(configdir=str(tmpdir), subparser=subcommand)
+    args = Namespace(
+        configdir=str(tmpdir), subparser=subcommand, environment=None)
     main(args)
     assert events.pop() == subcommand
 
 
 def test_main_fail(tmpdir):
-    args = Namespace(configdir=str(tmpdir), subparser='run')
+    args = Namespace(
+        configdir=str(tmpdir), subparser='run', environment=None)
     main(args)
 
     assert last_error_line()[0].endswith(
         "Maybe you need to run the 'init' command")
 
 
+@pytest.needs_docker_client
 class TestWithDockerDaemon(object):
     cli = None
     uid = None
@@ -146,7 +149,7 @@ class TestWithDockerDaemon(object):
     @classmethod
     def setup_class(cls):
         try:
-            cls.cli = docker.Client('172.17.42.1:4243')
+            cls.cli = pytest.docker_client
             assert cls.cli.images()
         except:
             pytest.xfail(
@@ -187,18 +190,34 @@ class TestWithDockerDaemon(object):
 
     @pytest.mark.slowtest
     def test_container_backup_restore(self, tmpdir):
-        configure_logger(test=True, verbosity=1)
+        """
+        This test also tests the manipulate_volumes() function extensively!
+        """
+        configure_logger(test=True, verbosity=1, debug=1)
         container = DockerContainer(
             self.cli, self.testcontainer, {}, {}, self.build_instructions())
         container.create()
+
+        def _get_busybox_id():
+            pattern = re.compile(
+                'busybox container with id (?P<id>[A-Ha-h0-9]*)')
+            res = pattern.findall('\n'.join(last_info_line(10)))
+            return res[-1]
 
         with pytest.raises(RuntimeError) as e:
             container.manipulate_volumes(command=['false'])
         assert 'failed with exit code' in str(e.value)
 
+        # check that container is removed after failed run
+        assert not self.cli.containers(
+            quiet=True, all=True, filters={'id': _get_busybox_id()})
+
         container.manipulate_volumes(
             command=['touch', '/data/empty_file']
         )
+        # check that container is removed after successful run
+        assert not self.cli.containers(
+            quiet=True, all=True, filters={'id': _get_busybox_id()})
 
         container.manipulate_volumes(
             command=['ls', '/data/'])
@@ -209,6 +228,12 @@ class TestWithDockerDaemon(object):
 
         assert os.path.exists(str(tmpdir.join('backup.tar.gz')))
 
+        container.backup(None, str(tmpdir), 'backup2')
+
+        backup2path = str(tmpdir.join('backup2.tar.gz'))
+        assert os.path.exists(backup2path)
+        os.system('gunzip {}'.format(backup2path))
+
         container.manipulate_volumes(
             command=['rm', '/data/empty_file']
         )
@@ -218,14 +243,15 @@ class TestWithDockerDaemon(object):
 
         assert last_info_line(3)[0].endswith("Output follows")
 
-        container.restore(str(tmpdir), 'backup')
+        for b, e in [('backup', '.gz'), ('backup2', '')]:
+            container.restore(str(tmpdir), b)
 
-        assert os.path.exists(str(tmpdir.join('backup.tar.gz')))
+            assert os.path.exists(str(tmpdir.join('{}.tar{}'.format(b, e))))
 
-        container.manipulate_volumes(
-            command=['ls', '/data/'])
+            container.manipulate_volumes(
+                command=['ls', '/data/'])
 
-        assert last_info_line(3)[0] == "empty_file"
+            assert last_info_line(3)[0] == "empty_file"
 
     @pytest.mark.parametrize(
         'tarname',
@@ -255,6 +281,7 @@ class TestWithDockerDaemon(object):
         assert not container.get_image('non-existent')
 
     @pytest.mark.slowtest
+    @pytest.needs_internet
     def test_pull_remove(self):
         container = DockerContainer(
             self.cli, self.testcontainer, {'image': 'hello-world'})
@@ -561,124 +588,17 @@ def test_substitute_run_args(container_handle, expected_name):
 
     mock_dc = MockDocker()
     dc = DockerContainer(mock_dc, 'test')
+
     res = dc._substitute_runtime_args([
-        "{{inspect['Name']}}" + container_handle,
-        "{{inspect['NetworkSettings']['IPAddress']}}",
-        "{{inspect['NetworkSettings']['Ports'].keys()}}"
+        "[[ inspect['Name'] ]]" + container_handle,
+        "[[inspect['NetworkSettings']['IPAddress'] ]]",
+        "[[inspect['NetworkSettings']['Ports'].keys() ]]"
     ])
 
     assert len(res) == 4
     assert res[0] == expected_name
     assert res[1] == '172.17.42.1'
     assert set(res[2:]) == set(['80', '443'])
-
-
-def test_environment_substitution(tmpdir):
-    testyaml = tmpdir.join('test.yaml')
-    os.environ['HOSTNAME'] = 'dummy'
-    envyaml = tmpdir.join('env.yaml')
-    abc_value = 'hello world'
-    envyaml.write("""
-THE_COMMAND: start
-BASEDIR: """ + str(tmpdir) + """
-COMMAND: '{{THE_COMMAND}}'
-abc: """ + abc_value)
-
-    testyaml.write("""
-{{HOSTNAME}}/cgit:
-    build:
-        path: {{BASEDIR}}/services/{{abc}}/cgit
-    startup:
-        binds:
-            ${CONFIG_DIR}/test:
-                bind: /var/test
-                ro: False
----
--
-    {{HOSTNAME}}/cgit:
-        command: {{COMMAND}}  # this does not make sense!
--
-    host:
-        command: exec
-        run:
-            - my_script
-            - "{{.NetworkSettings.IPAddress}}({{HOSTNAME}}/cgit)"
-""")
-    configuration, order_list = read_configuration(
-        str(testyaml), str(envyaml))
-    c_expected = {
-        'dummy/cgit': {
-            'build': {
-                'path': (
-                    '{}/services/{}/cgit'
-                    .format(str(tmpdir), abc_value)
-                ),
-            },
-            'startup': {
-                'binds': {
-                    '${CONFIG_DIR}/test': {'bind': '/var/test', 'ro': False}
-                }
-            }
-        }
-    }
-    ol_expected = [
-        {'dummy/cgit': {'command': 'start'}},
-        {'host': {
-            'command': 'exec',
-            'run': ['my_script', '{{.NetworkSettings.IPAddress}}(dummy/cgit)']
-        }}
-    ]
-    assert configuration == c_expected
-    assert order_list == ol_expected
-
-
-def test_read_configuration(tmpdir):
-    testyaml = tmpdir.join('test.yaml')
-    testyaml.write("""
-x1: abc
----
--
-    x1:
-        command: start
-""")
-    configurations, order_list = read_configuration(str(testyaml))
-    expect = {'x1': 'abc'}
-    assert configurations == expect
-    assert order_list == [{'x1': {'command': 'start'}}]
-
-    testyaml2 = tmpdir.join('test2.yaml')
-    testyaml2.write("""
-import: test.yaml
-x2: def
-x1: jkl
----
--
-    x1:
-       command: backup
-""")
-    expect2 = {'x1': 'jkl', 'x2': 'def'}
-    configurations, order_list = read_configuration(str(testyaml2))
-    assert configurations == expect2
-    assert order_list == [{'x1': {'command': 'backup'}}]
-
-    testyaml31 = tmpdir.join('test31.yaml')
-    testyaml31.write("""
-x3: ghi
----
-""")
-
-    testyaml3 = tmpdir.join('test3.yaml')
-    testyaml3.write("""
-import: ["test.yaml", "test31.yaml"]
----
--
-    x1:
-       command: backup
-""")
-    expect3 = {'x1': 'abc', 'x3': 'ghi'}
-    configurations, order_list = read_configuration(str(testyaml3))
-    assert configurations == expect3
-    assert order_list == [{'x1': {'command': 'backup'}}]
 
 
 def test_startup_manipulation(tmpdir):
@@ -710,5 +630,18 @@ def test_creation_manipulation():
 
     dc = DockerContainer(None, 'test', startup=startup)
     assert set(dc.creation['ports']) == set(ports)
+
+
+def test_statistics():
+    """
+    checks that the runtime statistics (junits) are collected correctly.
+    """
+
+
+def test_unit():
+    """
+    checks that the unit command works, executing a unit and collecting
+    information about it (logs / errors / statistics)
+    """
 
 # vim:set ft=python sw=4 et spell spelllang=en:

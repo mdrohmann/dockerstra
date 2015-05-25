@@ -1,4 +1,4 @@
-import: ["../nginx_server/start.yaml"]
+import: ["nginx_server/start"]
 git_repos:
     build:
         path: data/repositories

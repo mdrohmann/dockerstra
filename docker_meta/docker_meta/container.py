@@ -9,8 +9,7 @@ import docker
 import yaml
 
 import docker_meta.utils_spawn
-from docker_meta.configurations import (
-    read_configuration, Configuration, modify_order_list)
+from docker_meta.configurations import (Configuration)
 
 
 log = logging.getLogger(docker_meta.__name__)
@@ -57,32 +56,8 @@ def main_run(config, args):
 
     dc = get_docker_client(args.daemon)
 
-    environment = config.get_environment()
-
-    if args.environment:
-        with open(args.environment, 'r') as fh:
-            new_env = yaml.load(fh)
-            environment.update(new_env)
-
-    # transform the unitcommand to a configfile here
-    unit, command = args.unitcommand.rsplit('/', 1)
-    configfile = config.get_abspath(
-        os.path.join('units', unit, '{}.yaml'.format(command)))
-    if configfile:
-        configurations, order_list = read_configuration(
-            configfile, environment)
-    else:
-        configfile = config.get_abspath(
-            os.path.join('units', unit, 'start.yaml'))
-        if configfile:
-            configurations, order_list = read_configuration(
-                configfile, environment)
-            order_list = modify_order_list(
-                configurations, order_list, command)
-        else:
-            raise RuntimeError(
-                "Could not create a configuration for unit/command tuple {}!"
-                .format(args.unitcommand))
+    configurations, order_list = config.read_unit_configuration(
+        args.unitcommand)
 
     if args.print_only:
         print yaml.safe_dump_all([configurations, order_list])
@@ -117,7 +92,9 @@ def main_list(config, args):
 def main(args):
 
     try:
-        config = Configuration(args.configdir)
+        remainder = getattr(args, 'args', [])
+        config = Configuration(args.configdir, remainder)
+        config.update_environment(args.environment)
 
         if args.subparser == 'init':
             config.initialize()
@@ -306,7 +283,7 @@ class DockerContainer(object):
     def _substitute_runtime_args(self, args):
         new_args = []
         pattern = re.compile(
-            '^{{(?P<formula>.*)}}(\((?P<container>[^)]*)\))?$')
+            '^\[\[(?P<formula>.*)\]\](\((?P<container>[^)]*)\))?$')
         for arg in args:
             res = pattern.match(arg.strip())
             if res:
@@ -392,6 +369,10 @@ class DockerContainer(object):
             detach=False,
             command=command)
 
+        log.debug(
+            'manipulate_volumes created a busybox container with id {}.'
+            .format(info['Id']))
+
         self.dc.start(
             info,
             volumes_from=self.name,
@@ -402,17 +383,21 @@ class DockerContainer(object):
         stdout = self.dc.logs(info)
 
         info_line = (
-            'Executing command {} on container {}.  Output follows\n{}'
+            'Executing command {} on file system of container {}.  '
+            'Output follows\n{}'
             .format(command, self.name, stdout))
         self._log_output(info_line, 'manipulate_volumes')
 
         if exit_code != 0:
             stderr = self.dc.logs(info, stdout=False, stderr=True, tail=3)
+
+        self.dc.remove_container(info)
+
+        if exit_code != 0:
             raise RuntimeError(
                 "Manipulation of volume {} failed with exit code {}:\n{}"
                 .format(command, exit_code, stderr))
 
-        self.dc.remove_container(info)
         log.info(
             "Successfully executed command {} in container {}."
             .format(command, self.name))
@@ -574,5 +559,6 @@ def run_configuration(
                 "Invalid command {} for container {}".format(cmd, name))
 
         time.sleep(wait_time)
+
 
 # vim:set ft=python sw=4 et spell spelllang=en:
