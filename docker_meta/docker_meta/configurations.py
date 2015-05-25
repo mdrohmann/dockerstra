@@ -259,9 +259,9 @@ class Configuration(object):
                 cmd = order['command']
                 if cmd == 'start':
                     starts.append(name)
-                elif cmd == 'create':
+                if cmd in ['start', 'create']:
                     creations.append(name)
-                elif cmd == 'build':
+                if cmd in ['start', 'build', 'create']:
                     build_config = configurations[name].get('build', {})
                     if build_config.get('tag'):
                         builds.append(name)
