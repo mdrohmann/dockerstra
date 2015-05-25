@@ -1,0 +1,73 @@
+# creates a minimal virtualenv environment in which python code can be executed
+{%- set interactive=True if (args.command in ['bash'] or args.interactive) -%}
+{%- set env_variant=[args.virtualenv, args.extra_name] | join('_') -%}
+{%- set run_variant=[env_variant, args.command] | join('_') -%}
+{%- set isjob=True if args.command not in ['daemon'] -%}
+{%- set cleanup=True if args.command not in ['daemon'] or args.no_cleanup -%}
+{%- if args.command == 'bash' -%}
+{%- set entrypoint='["/bin/bash"]' -%}
+{%- elif args.command == 'exec' -%}
+{%- set entrypoint='["/init", "exec", "{uid}", "{gid}", "python", "{workdir}"]'.format(**env) -%}
+{%- else -%}
+{%- set entrypoint='["/init", "run"]' -%}
+{%- endif args.command -%}
+{%- set container_name="python_host_{}".format(run_variant) -%}
+{%- import "{}.jinja_macros".format(args.virtualenv) as ext -%}
+{{container_name}}:
+    build:
+        path: {{DOCKER_REPO}}/services/python_hosts/{{args.virtualenv}}
+        tag: mdrohmann/python_host_{{args.virtualenv}}
+    creation:
+        detach: False
+        {%-if interactive -%}
+        tty: True
+        stdin_open: True
+        {%-endif interactive -%}
+        entrypoint: {{entrypoint}}["/bin/bash"]
+        {%- if args.args -%}
+        command: args.args
+        {%- endif args.args -%}
+    startup:
+        volumes_from:
+            virtualenv_{{env_variant}}
+            {{ ext.volumes_from(args, container_name) | indent(12) }}
+        binds:
+            {{PYTHON_HOSTS}}/{{args.virtualenv}}:
+                bind: /data
+                ro: False
+            {{ ext.binds(args, container_name) | indent(12) }}
+        links:
+            pypicloud: pypi-internal.main
+            {{ ext.links(args, container_name) | indent(12) }}
+    daemon:
+        {{ ext.daemon(args, container_name) | indent(8) }}
+    e2e-checks:
+        {{ ext.e2e-check(args, container_name) | indent(8) }}
+    jobs:
+        {{ ext.jobs(args, container_name) | indent(8) }}
+    tests:
+        {{ ext.tests(args, container_name) | indent(8) }}
+virtualenv_{{env_variant}}:
+    creation:
+        image: busybox:latest
+        command: /bin/true
+        volumes: ["/virtualenv"]
+---
+-
+    virtualenv_{{env_variant}}:
+        command: create
+-
+    {{container_name}}:
+        command: start
+        {%- if isjob -%}
+        wait: True
+        {%- endif isjob -%}
+{%- if cleanup -%}
+-
+    {{container_name}}:
+        command: remove
+        v: True
+        force: False
+{%- endif cleanup -%}
+
+# vim:set et sw=4 et:
