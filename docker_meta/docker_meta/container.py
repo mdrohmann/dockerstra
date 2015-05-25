@@ -129,7 +129,8 @@ class DockerContainer(object):
 
     def __init__(
             self, dc, name, creation={}, startup={}, build={},
-            global_config=Configuration(), unitname='unknown/unknown'):
+            global_config=Configuration(), unitname='unknown/unknown',
+            daemon=None, e2e_checks=None, jobs=None, tests=None):
 
         self.dc = dc
         self.unitname = unitname   # TODO: this has been added to the signature
@@ -140,6 +141,10 @@ class DockerContainer(object):
         self.global_config = global_config
         self._update_start_config()
         self._update_creation_config()
+        self.daemon = daemon
+        self.e2e_checks = e2e_checks
+        self.jobs = jobs
+        self.tests = tests
         log.debug("Initialized docker container {}".format(name))
 
     def _buildpath(self):
