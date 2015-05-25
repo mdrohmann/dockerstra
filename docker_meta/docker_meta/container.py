@@ -153,12 +153,15 @@ class DockerContainer(object):
         """
         config_dir = self._buildpath()
 
-        nfro = fro.replace('${CONFIG_DIR}', config_dir)
-        if nfro != fro:
-            log.debug(
-                'Replaced ${{CONFIG_DIR}} in {} with {}.'
-                .format(fro, config_dir))
-        return nfro
+        substs = {'CONFIG_DIR': config_dir, 'PWD': os.getcwd()}
+
+        for k, v in substs:
+            nfro = fro.replace('${{{}}}'.format(k), v)
+            if nfro != fro:
+                log.debug(
+                    'Replaced ${{{}}} in {} with {}.'
+                    .format(k, fro, v))
+            return nfro
 
     def _update_start_config(self):
         if 'binds' in self.startup:
