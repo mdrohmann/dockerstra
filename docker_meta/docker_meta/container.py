@@ -213,7 +213,7 @@ class DockerContainer(object):
     def __str__(self):
         return self.get_container().get('Id', 'No id yet')
 
-    def start(self, restart=False, timeout=10):
+    def start(self, restart=False, attach=False, timeout=10):
         container = self.get_container()
         if container:
             if restart or not self.is_started():
@@ -232,13 +232,25 @@ class DockerContainer(object):
                 # Create the container ...
                 self.create()
                 # ... and then start it.
-                self.dc.start(container=self.name, **self.startup)
+                container = self.get_container()
+                self.dc.start(container, **self.startup)
                 log.info("Started container {}".format(self.name))
             except Exception as e:
                 raise RuntimeError(
                     "Container {} does not exist, and I do not know how to "
                     "create it:\n {}"
                     .format(self.name, e))
+        if attach:
+            for line in self.dc.logs(
+                    container, stdout=True, stderr=True, stream=True,
+                    tail='all'):
+
+                self._log_output(line, 'attach')
+            exitcode = self.dc.wait(container)
+            if exitcode != 0:
+                raise RuntimeError(
+                    "Container {} stopped with exit {}!"
+                    .format(self.name, exitcode))
 
     def build_image(self):
         imjson = self.get_image()
@@ -354,8 +366,8 @@ class DockerContainer(object):
                 .format(self.name))
             return None
         try:
-            self._log_output(
-                self.dc.create_container(**self.creation), 'create_container')
+            res = self.dc.create_container(**self.creation)
+            self._log_output(res, 'create_container')
             log.info("Successfully created the container {}".format(self.name))
         except docker.errors.APIError as e:
             if 'No such image' in str(e):
@@ -538,7 +550,8 @@ def run_configuration(
             container.create()
         elif cmd == 'start':
             restart = orders.pop('restart', False)
-            container.start(restart, timeout)
+            attach = orders.pop('attach', False)
+            container.start(restart, attach, timeout)
         elif cmd == 'restore':
             restore_dir = os.path.abspath(orders.get('restore_dir', '.'))
             restore_name = orders.get('restore_name', 'backup')
