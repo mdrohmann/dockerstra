@@ -74,11 +74,13 @@ TEST: 1
     else:
         environment = {}
 
-    for po in [False, True]:
+    for po, ps in [(False, False), (False, True), (True, False)]:
         args = Namespace(
             daemon=None,
             environment=environment,
-            unitcommand=unitcommand, print_only=po)
+            unitcommand=unitcommand,
+            print_only=po,
+            print_substitutions=ps)
 
         if error:
             with pytest.raises(error):
@@ -87,7 +89,7 @@ TEST: 1
 
         main_run(config, args)
 
-        if po:
+        if po or ps:
             out, _ = capsys.readouterr()
             outlist = list(yaml.load_all(out))
         else:
@@ -327,7 +329,8 @@ class TestWithDockerDaemon(object):
     @pytest.mark.slowtest
     @pytest.mark.parametrize(
         'with_volumes_from',
-        [False, True])
+        [False, True],
+        ids=['without_volumes', 'with_volumes'])
     def test_container_creation(self, tmpdir, with_volumes_from):
         configure_logger(test=True, verbosity=1, debug=1)
         creation = {'image': self.testimage}
@@ -423,7 +426,7 @@ def test_container_configuration_fail():
         assert e.message.startswith('Could not find a configuration for')
 
 default_events = [
-    ('start', ['x3', False, 10]), 12,
+    ('start', ['x3', False, False, 10]), 12,
     ('create', ['x2']), 0,
     ('build_image', ['x1']), 0,
     ('backup', ['x1', '/volume', os.getcwd(), 'testbackup', False]), 0,
@@ -601,10 +604,15 @@ def test_substitute_run_args(container_handle, expected_name):
     assert set(res[2:]) == set(['80', '443'])
 
 
-def test_startup_manipulation(tmpdir):
+@pytest.mark.parametrize('var',
+    ['CONFIG_DIR', 'PWD'])
+def test_startup_manipulation(tmpdir, var):
+    """
+    checks that CONFIG_DIR and PWD are replaced correctly for the binds keyword
+    """
     with tmpdir.as_cwd():
         os.mkdir(str(tmpdir.join('path')))
-        bind_path_host = '${CONFIG_DIR}/path'
+        bind_path_host = '${{{}}}/path'.format(var)
         bind_container = {'binds': 'path', 'ro': True}
         startup = {
             'other_key': 'other_value',
