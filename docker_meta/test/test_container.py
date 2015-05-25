@@ -338,10 +338,14 @@ class TestWithDockerDaemon(object):
 
     @pytest.mark.slowtest
     @pytest.mark.parametrize(
-        'with_volumes_from',
-        [False, True],
-        ids=['without_volumes', 'with_volumes'])
-    def test_container_creation(self, tmpdir, with_volumes_from):
+        'with_volumes_from,command,expect_failure',
+        [(False, ['echo', 'hello world'], False),
+         (False, ['false'], True),
+         (True, ['echo', 'hello world'], False)],
+        ids=['without_volumes', 'without_volumes_fail', 'with_volumes'])
+    def test_container_creation_and_start(
+            self, tmpdir, with_volumes_from, command, expect_failure):
+
         configure_logger(test=True, verbosity=1, debug=1)
         creation = {'image': self.testimage}
         container = DockerContainer(self.cli, self.testcontainer, creation)
@@ -372,9 +376,17 @@ class TestWithDockerDaemon(object):
             startup = {}
 
         container = DockerContainer(
-            self.cli, self.testcontainer, {}, startup, build_instructions)
+            self.cli, self.testcontainer,
+            {'command': command}, startup, build_instructions)
 
-        container.start()
+        if expect_failure:
+            with pytest.raises(RuntimeError) as e:
+                container.start(attach=True)
+            assert 'stopped with exit code' in str(e.value)
+        else:
+            container.start(attach=True)
+            assert 'hello world' in last_info_line()[0]
+
 
         # Do it twice, to see that there are no errors the second time.
         container.start()

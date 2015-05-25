@@ -261,7 +261,7 @@ class DockerContainer(object):
             exitcode = self.dc.wait(container)
             if exitcode != 0:
                 raise RuntimeError(
-                    "Container {} stopped with exit {}!"
+                    "Container {} stopped with exit code {}!"
                     .format(self.name, exitcode))
 
     def build_image(self):
