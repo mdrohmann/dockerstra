@@ -284,14 +284,16 @@ test_configurations2 = {
         'stop', 'cleanup', 'purge', 'restart', 'build', 'create',
         'test', 'testfull', 'testproduction', 'backup', 'restore',
     ])
-def test_modify_order_list(init, command, expected):
+def test_modify_order_list(test_init, init, command, expected):
+
+    c, etcdir = test_init
 
     configurations = {
         'x1_without_build': {},
         'x2_with_build': {'build': {'tag': 'test'}},
     }
 
-    new_configurations, new_order = modify_order_list(
+    new_configurations, new_order = c.modify_order_list(
         configurations, init, command)
 
     expected_order, expected_configurations = expected
@@ -314,28 +316,7 @@ def test_list_units(test_init):
     assert set(c.list_units(False)).intersection(some_units) == some_units
 
 
-# - add_argument:
-#     name: '--language'
-#     short: '-l'
-#     choices: ['python', 'node']
-#     default: 'python'
-#     help: 'language of the host container'
-# - add_argument:
-#     name: 'command'
-#     choices: ['initialize', 'exec', 'host-exec', 'bash', 'daemon', 'single',
-#     'upgrade']
-#     default: 'initialize'
-#     help: 'define what to do with the container'
-# - add_argument:
-#     name: 'args'
-#     nargs: argparse.REMAINDER
-def test_environment_argparser(test_init):
-    """
-    checks that the environment argparser is initialized from an environment
-    """
-    pass
-
-
+@pytest.mark.xfail
 def test_list_variants_complex(test_init):
     """
     checks that the variants are shown correctly for a combination of test and
@@ -343,7 +324,7 @@ def test_list_variants_complex(test_init):
     """
 
 
-@pytest.mark.current
+@pytest.mark.xfail
 def test_list_variants(test_init):
     c, etcdir = test_init
 
@@ -377,6 +358,7 @@ def test_list_unit_commands(test_init):
         'nginx_server/stop',
         'nginx_server/cleanup',
         'nginx_server/purge',
+        'gitlab-ce/start',
         'selenium/start',
         'selenium/stop',
         'selenium/cleanup',
@@ -389,6 +371,8 @@ def test_list_unit_commands(test_init):
         u for u in c.list_units() if u.startswith('dev_servers/')]
     assert set(found_dev_server_units) == dev_server_units
     assert set(c.list_units()).intersection(some_units) == some_units
+
+    assert 'python_hosts/globals' not in set(c.list_units())
 
 
 @pytest.mark.parametrize(
