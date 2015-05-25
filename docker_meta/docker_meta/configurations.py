@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import argparse
+from copy import copy
 import logging
 import os
 import sys
@@ -282,12 +283,12 @@ class Configuration(object):
                         {'command': 'start', 'restart': True, 'timeout': 0}})
         if command in ['stop', 'cleanup', 'purge']:
             for started in reversed(starts):
-                new_order_list.append({started: stop_command})
+                new_order_list.append({started: copy(stop_command)})
         if command in ['cleanup', 'purge']:
             for started in reversed(starts):
-                new_order_list.append({started: remove_order})
+                new_order_list.append({started: copy(remove_order)})
             for created in reversed(creations):
-                new_order_list.append({created: remove_order})
+                new_order_list.append({created: copy(remove_order)})
 
         if command == 'purge':
             for built in reversed(builds):
