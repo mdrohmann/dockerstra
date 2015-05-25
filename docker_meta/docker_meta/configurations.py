@@ -172,7 +172,7 @@ class Configuration(object):
             with open(filename, 'r') as fh:
                 new_env = yaml.load(fh)
             self.environment.update(new_env)
-        self.environment.update(os.environ)
+        self.environment.update({'osenv': os.environ})
 
     @property
     def environment(self):

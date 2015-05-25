@@ -129,7 +129,8 @@ def test_get_environment(test_init):
 
     env = c.environment
     assert set(env.keys()) == set(
-        ['DOCKERSTRA_CONF', 'DOCKER_HOST', 'BACKUP_DIR', 'test', 'other'])
+        ['DOCKERSTRA_CONF', 'DOCKER_HOST', 'BACKUP_DIR',
+         'test', 'other', 'osenv'])
 
 
 dummy_modify_init_order_list = [
@@ -534,7 +535,7 @@ abc: """ + abc_value)
     c.update_environment('')
 
     testyaml.write("""
-{{HOSTNAME}}/cgit:
+{{osenv.HOSTNAME}}/cgit:
     build:
         path: {{BASEDIR}}/services/{{abc}}/cgit
     startup:
@@ -544,14 +545,14 @@ abc: """ + abc_value)
                 ro: False
 ---
 -
-    {{HOSTNAME}}/cgit:
+    {{osenv.HOSTNAME}}/cgit:
         command: {{COMMAND}}  # this does not make sense!
 -
     host:
         command: exec
         run:
             - my_script
-            - "[[.NetworkSettings.IPAddress]]({{HOSTNAME}}/cgit)"
+            - "[[.NetworkSettings.IPAddress]]({{osenv.HOSTNAME}}/cgit)"
 """)
     configuration, order_list = c.read_unit_configuration('test/start')
     c_expected = {
