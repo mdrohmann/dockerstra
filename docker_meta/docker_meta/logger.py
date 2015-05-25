@@ -64,6 +64,7 @@ class OutputFilter(logging.Filter):
                 out.update(md)
                 record.msg = '({id}) {status}: {progressDetail}'.format(**out)
 
+        record.msg = record.msg.strip()
         return True
 
 
