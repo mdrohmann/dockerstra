@@ -121,7 +121,6 @@ def _get_logger_configuration(
             'docker_meta': {
                 'level': 'INFO',
                 'propagate': False,
-                'handlers': ['info_stream', 'error_stream'],
             },
         },
     }
@@ -157,6 +156,8 @@ def _update_handlers(config, stream_configs, handlers):
         tc[name].update(sc)
         config['handlers'].update(tc)
 
+    config['loggers']['docker_meta']['handlers'] = handlers
+
 
 def _get_streams(infofiles, errorfiles, test):
     if test:
@@ -167,12 +168,12 @@ def _get_streams(infofiles, errorfiles, test):
     else:
         res = []
         handlers = []
-        _get_single_stream(infofiles, res, sys.stdout, 'info', handlers)
-        _get_single_stream(errorfiles, res, sys.stderr, 'error', handlers)
+        _update_single_stream(infofiles, res, sys.stdout, 'info', handlers)
+        _update_single_stream(errorfiles, res, sys.stderr, 'error', handlers)
     return res, handlers
 
 
-def _get_single_stream(infofiles, res, default, typ, handlers):
+def _update_single_stream(infofiles, res, default, typ, handlers):
     if infofiles is None:
         infofiles = [default]
     if isinstance(infofiles, basestring):
@@ -181,8 +182,8 @@ def _get_single_stream(infofiles, res, default, typ, handlers):
         info_stream_config = _get_stream_for_file(
             infofile)
         name = '{}_stream'.format(typ)
-        if n > 1:
-            name += str(n)
+        if n > 0:
+            name += str(n + 1)
         res.append((info_stream_config, name, typ))
         handlers.append(name)
 

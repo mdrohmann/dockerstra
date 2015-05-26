@@ -1,18 +1,44 @@
 import logging
 import sys
+from StringIO import StringIO
 
 import pytest
 
 import docker_meta.container
 from docker_meta.logger import (
     _get_logger_configuration, configure_logger,
-    last_info_line, last_error_line, info_lines, error_lines)
+    last_info_line, last_error_line, info_lines, error_lines,
+    update_logger, reset_logger)
 
 
 @pytest.fixture
 def logger():
     configure_logger(test=True)
     return logging.getLogger(docker_meta.__name__)
+
+
+def test_multiple_loggers():
+    info1 = StringIO()
+    info2 = StringIO()
+    configure_logger(infofiles=[info1, info2])
+    log = logging.getLogger(docker_meta.__name__)
+    assert len(log.handlers) == 3
+    log.info('test')
+    assert len(info1.getvalue().strip().split('\n')) == 1
+    assert len(info2.getvalue().strip().split('\n')) == 1
+
+
+def test_update_logger(logger):
+    assert len(logger.handlers) == 2
+    logger.info('test')
+    assert len(last_info_line(None)) == 1
+
+    update_logger(infofiles=[StringIO(), StringIO()])
+    assert len(logger.handlers) == 3
+
+    reset_logger()
+    logger.info('test2')
+    assert len(last_info_line(None)) == 2
 
 
 def test_configure_logger_global(logger):
