@@ -51,8 +51,20 @@ class UnitListCompleter(object):
 
     def complete(self, prefix, parsed_args, **kwargs):
         c = Configuration(parsed_args.configdir)
-        return [
-            s for s in c.list_units(self.showCommands) if s.startswith(prefix)]
+        modes = prefix.rsplit(':')
+        if len(modes) > 1 and self.showCommands:
+            mode_candidate = modes[-1]
+            unitcommand = modes[0]
+            candidates = set([
+                s for s in c.get_available_modes(self, unitcommand)
+                if s.startswith(mode_candidate)])
+            candidates.difference_update(set(modes[1:]))
+            candidates = sorted(list(candidates))
+        else:
+            candidates = [
+                s for s in c.list_units(self.showCommands)
+                if s.startswith(prefix)]
+        return candidates
 
 
 def serviceListCompleter(prefix, parsed_args, **kwargs):
@@ -199,9 +211,15 @@ class Configuration(object):
         else:
             return None
 
-    def parse_args(self, global_config):
-        parser = argparse.ArgumentParser()
-        for arg in global_config.get('parser', []):
+    def parse_args(self, global_config, unit, command):
+        parser_section = global_config.get('parser', {})
+        parser_opts = parser_section.get('global', [])
+        parser_opts += parser_section.get(command, [])
+
+        parser = argparse.ArgumentParser(
+            prog='{} run [...] {}/{}'.format(sys.argv[0], unit, command))
+
+        for arg in parser_opts:
             k, v = arg.items()[0]
             assert k == 'argument'
             args = [
@@ -215,12 +233,15 @@ class Configuration(object):
     def unit_substitutions(
             self, unitcommand, global_config=None):
 
+        unit, command, modes = self.split_unit_command(unitcommand)
         extra_environment = {}
         loader = FileSystemLoader(
             self.get_abspath(os.path.join('units')))
 
         if global_config:
-            extra_environment = self.parse_args(global_config)
+            extra_environment = self.parse_args(global_config, unit, command)
+            extra_environment.update({
+                'modes': self.get_active_modes(global_config, command, modes)})
 
             if 'jinja' in global_config:
                 macroloader_path = (
@@ -242,7 +263,8 @@ class Configuration(object):
             os.path.join('units', unit, '{}.yaml'.format(command)))
         if candidate:
             return '{}/{}'.format(unit, command)
-        elif command != 'start':
+        elif command != 'start' and (
+                '{}/{}'.format(unit, command) in self.list_units(True)):
             return self.get_base_command(unit, 'start')
 
         raise RuntimeError(
@@ -322,7 +344,7 @@ class Configuration(object):
         return new_configurations, new_order_list
 
     def read_unit_configuration(self, unitcommand, print_substitutions=False):
-        unit, command = self.split_unit_command(unitcommand)
+        unit, command, modes = self.split_unit_command(unitcommand)
         unit_globals = self.get_unit_globals(unit)
 
         candidate = self.get_base_command(unit, command)
@@ -438,7 +460,10 @@ class Configuration(object):
             return None
 
     def _get_environment(self):
-        environment = {'DOCKERSTRA_CONF': self.basedir}
+        environment = {
+            'DOCKERSTRA_CONF': self.basedir,
+            'UID': os.getuid(),
+            'GID': os.getgid()}
         env_base_path = self.get_abspath('environments')
         if env_base_path:
             for f in os.listdir(env_base_path):
@@ -449,25 +474,11 @@ class Configuration(object):
         return environment
 
     def split_unit_command(self, unitcommand):
-        return unitcommand.rsplit('/', 1)
-
-    def list_tagged_variants(self, base_config):
-        raise NotImplementedError()
-
-    def list_test_variants(self, base_config):
-        raise NotImplementedError()
-
-    def list_variants(self, unitcommand):
-        unit, command = self.split_unit_command(unitcommand)
-        if command == 'test':
-            return self.list_test_variants(unit)
-        else:
-            base_config = self.get_base_command(unit, command)
-            if not base_config:
-                raise RuntimeError(
-                    "Invalid command: No configuration file for {}/{}"
-                    .format(unit, command))
-            return self.list_tagged_variants(base_config)
+        unit, commandmodes = unitcommand.rsplit('/', 1)
+        splits = commandmodes.split(':')
+        command = splits[0]
+        modes = splits[1:]
+        return unit, command, modes
 
     def list_units(self, list_commands=True):
         units_base_path = self.get_abspath('units')
@@ -494,6 +505,55 @@ class Configuration(object):
                 res += list(fres)
             elif fres:
                 res.append(f)
+        return res
+
+    def _get_mode_config(self, global_config, command):
+        mode_section = global_config.get('modes', {})
+        modes = set(mode_section.get('global', []))
+        modes.update(set(mode_section.get(command, [])))
+        group_section = global_config.get('groups', {})
+        groups = copy(group_section.get('global', {}))
+        groups.update(group_section.get(command, {}))
+
+        # validate, that the right atoms exist
+        used_atoms = set([])
+        for gc in groups.values():
+            used_atoms.update(gc)
+        difference = used_atoms.difference(set(modes))
+        if difference:
+            raise RuntimeError(
+                "The mode group references undefined mode atoms {}."
+                .format(repr(list(difference))))
+        return list(modes), groups
+
+    def get_available_modes(self, unitcommand):
+        """
+        gets all available modes for this unit/command tuple.
+        """
+        unit, command, modes = self.split_unit_command(unitcommand)
+        global_config = self.get_unit_globals(unit)
+
+        if global_config:
+            return self._get_mode_config(global_config, command)
+        else:
+            return [], {}
+
+    def get_active_modes(self, global_config, command, modes):
+        """
+        parses the global_config for groups and returns all the atoms, that are
+        selected by these groups.
+        """
+
+        atoms, groups = self._get_mode_config(global_config, command)
+        res = set([])
+        for mode in modes:
+            if mode in groups:
+                res.update(groups[mode])
+            elif mode in atoms:
+                res.add(mode)
+            else:
+                raise RuntimeError(
+                    "Invalid mode selected: {}".format(mode))
         return res
 
     def list_services(self):

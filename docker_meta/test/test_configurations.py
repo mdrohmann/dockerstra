@@ -5,9 +5,54 @@ from argparse import Namespace
 import pytest
 from docker_meta.container import (
     main_list)
-from docker_meta.configurations import (Configuration, create_parser)
+from docker_meta.configurations import (
+    Configuration, create_parser, UnitListCompleter)
 from docker_meta.logger import (
     configure_logger, last_info_line)
+
+
+def test_unit_list_completer(monkeypatch, tmpdir):
+    monkeypatch.setattr(
+        Configuration, 'get_available_modes', lambda *args: ['aa', 'ab', 'bc'])
+    monkeypatch.setattr(
+        Configuration, 'list_units',
+        lambda *args: ['a/start', 'a/stop', 'ab/start'])
+
+    args = Namespace(configdir=str(tmpdir))
+    ulc = UnitListCompleter(True)
+    assert ulc.complete('', args) == ['a/start', 'a/stop', 'ab/start']
+    assert ulc.complete('a/', args) == ['a/start', 'a/stop']
+    assert ulc.complete('a/sto', args) == ['a/stop']
+    assert ulc.complete('b', args) == []
+    assert ulc.complete('a/start:', args) == ['aa', 'ab', 'bc']
+    assert ulc.complete('a/start:a', args) == ['aa', 'ab']
+    assert ulc.complete('a/start:c', args) == []
+    assert ulc.complete('a/start:aa:', args) == ['ab', 'bc']
+    assert ulc.complete('a/start:aa:a', args) == ['ab']
+    assert ulc.complete('a/start:aa:ab:', args) == ['bc']
+    monkeypatch.setattr(
+        Configuration, 'list_units',
+        lambda *args: ['a', 'ab'])
+
+    ulc2 = UnitListCompleter(False)
+    assert ulc2.complete('', args) == ['a', 'ab']
+    assert ulc2.complete('a', args) == ['a', 'ab']
+    assert ulc2.complete('ab', args) == ['ab']
+    assert ulc2.complete('c', args) == []
+    assert ulc2.complete('a/start', args) == []
+
+
+@pytest.mark.xfail
+def test_create_unit_configuration():
+    """
+    checks that all necessary fields for a 'unit' order are created.
+    """
+
+    args = c.make_unit_configuration(argdict)
+
+    assert args.infofile == infofile
+    assert args.command == 'run'
+    assert args.unitcommand == unitcommand
 
 
 @pytest.mark.parametrize('cmdline,expect', [
@@ -130,7 +175,7 @@ def test_get_environment(test_init):
     env = c.environment
     assert set(env.keys()) == set(
         ['DOCKERSTRA_CONF', 'DOCKER_HOST', 'BACKUP_DIR',
-         'test', 'other', 'osenv'])
+         'test', 'other', 'osenv', 'GID', 'UID'])
 
 
 dummy_modify_init_order_list = [
@@ -196,7 +241,6 @@ test_configurations2 = {
 }
 
 
-@pytest.mark.current
 @pytest.mark.parametrize('init,command,expected', [
     (
         dummy_modify_init_order_list,
@@ -233,7 +277,7 @@ test_configurations2 = {
             {'x1_without_build': {'command': 'create'}},
             {'x2_with_build': {'command': 'create'}},
             ], None)
-    ), (
+    ), pytest.mark.xfail((
         # TODO: 1. add unit command,
         # 2. add environment substitutions
         # 3. add test_collector unit
@@ -243,16 +287,16 @@ test_configurations2 = {
         'test', (
             test_start1 + test_collection + test_remove_container1,
             {})
-    ), (
+    )), pytest.mark.xfail((
         dummy_modify_init_order_list,
         'test:full', (
             test_start2 + test_collection + test_remove_container2,
             {})
-    ), (
+    )), pytest.mark.xfail((
         dummy_modify_init_order_list,
         'test:production', (
             test_collection, {})
-    ), (
+    )), (
         dummy_modify_init_order_list,
         'backup', ([
             {'x1_without_build': {
@@ -327,6 +371,75 @@ def test_list_units(test_init):
         'selenium',
         ])
     assert set(c.list_units(False)).intersection(some_units) == some_units
+
+
+class TestModes(object):
+
+    gc = {
+        'modes': {
+            'global': ['ga', 'gb'],
+            'test': ['ta', 'tb'],
+            },
+        'groups': {
+            'global': {
+                'GG': ['ga', 'gb'],
+                },
+            'test': {
+                'GT': ['ga', 'tb'],
+                },
+            'other': {
+                'INVALID': ['ga', 'unknown']
+                }
+            }
+        }
+
+    @pytest.fixture()
+    def configuration(self, tmpdir):
+        return Configuration(str(tmpdir))
+
+    def test_get_mode_config(self, configuration):
+        c = configuration
+        modes, groups = c._get_mode_config(self.gc, 'test')
+        assert set(modes) == set(['ga', 'gb', 'ta', 'tb'])
+        assert set(groups.keys()) == set(['GG', 'GT'])
+
+        modes, groups = c._get_mode_config(self.gc, 'test2')
+        assert set(modes) == set(['ga', 'gb'])
+        assert set(groups.keys()) == set(['GG'])
+
+        with pytest.raises(RuntimeError) as e:
+            c._get_mode_config(self.gc, 'other')
+        assert str(e.value).endswith(
+            'undefined mode atoms {}.'.format(repr(['unknown'])))
+
+    @pytest.mark.parametrize(
+        'command,modes,expect',
+        [
+            ('test', ['GT', 'ta'], set(['ga', 'tb', 'ta'])),
+            ('test', ['GG', 'GT'], set(['ga', 'gb', 'tb'])),
+            ('other2', ['GG', 'ga'], set(['ga', 'gb'])),
+        ])
+    def test_active_modes(self, configuration, command, modes, expect):
+        c = configuration
+        assert c.get_active_modes(self.gc, command, modes) == expect
+
+    def test_active_modes_fail(self, configuration):
+
+        with pytest.raises(RuntimeError):
+            configuration.get_active_modes(self.gc, 'test', ['tc'])
+
+    def test_available_modes(self, configuration, monkeypatch):
+        monkeypatch.setattr(
+            configuration, 'get_unit_globals', lambda *args: self.gc)
+
+        modes, groups = configuration.get_available_modes('unit/test')
+        assert set(modes) == set(['ga', 'gb', 'ta', 'tb'])
+        assert set(groups.keys()) == set(['GG', 'GT'])
+
+        monkeypatch.setattr(
+            configuration, 'get_unit_globals', lambda *args: None)
+
+        assert configuration.get_available_modes('unit/test') == ([], {})
 
 
 @pytest.mark.xfail
@@ -500,11 +613,12 @@ import: ["{{args.import}}", "{{args.args[0]}}"]
     globalconf = testunitdir.join('globals.yaml')
     globalconf.write("""
 parser:
-    - argument:
-         name: 'import'
-    - argument:
-         name: 'args'
-         nargs: 'argparse.REMAINDER'
+    global:
+        - argument:
+             name: 'import'
+        - argument:
+             name: 'args'
+             nargs: 'argparse.REMAINDER'
 jinja:
     macroloader_path: {}
 environment:

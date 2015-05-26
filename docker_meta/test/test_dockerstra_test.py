@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
 
-def test_manipulate_names_and_tags():
+def test_tempid_injection():
     """
-    makes sure, that the container names and tags are manipulated correctly
-    if necessary.
+    makes sure, that the tempid is injected in the environment of the called
+    units...
     """
     assert False
 
