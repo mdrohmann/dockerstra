@@ -177,6 +177,9 @@ def test_get_environment(test_init):
         ['DOCKERSTRA_CONF', 'DOCKER_HOST', 'BACKUP_DIR',
          'test', 'other', 'osenv', 'GID', 'UID'])
 
+    c.update_environment({'hallo': 'welt'})
+    assert c.environment['hallo'] == 'welt'
+
 
 dummy_modify_init_order_list = [
     {'x1_without_build': {'command': 'build'}},

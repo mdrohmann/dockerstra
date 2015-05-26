@@ -184,12 +184,15 @@ class Configuration(object):
         self._environment = None
         self.args = args
 
-    def update_environment(self, filename):
-        self.environment.update(self._get_environment())
-        if filename:
-            with open(filename, 'r') as fh:
-                new_env = yaml.load(fh)
-            self.environment.update(new_env)
+    def update_environment(self, filename_or_dict):
+        if type(filename_or_dict) is dict:
+            self.environment.update(filename_or_dict)
+        else:
+            self.environment.update(self._get_environment())
+            if filename_or_dict:
+                with open(filename_or_dict, 'r') as fh:
+                    new_env = yaml.load(fh)
+                self.environment.update(new_env)
         self.environment.update({'osenv': os.environ})
 
     @property
