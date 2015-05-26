@@ -130,7 +130,7 @@ class DockerContainer(object):
     def __init__(
             self, dc, name, creation={}, startup={}, build={},
             global_config=Configuration(), unitname='unknown/unknown',
-            daemon=None, e2e_checks=None, jobs=None, tests=None):
+            **kwargs):
 
         self.dc = dc
         self.unitname = unitname   # TODO: this has been added to the signature
@@ -141,10 +141,7 @@ class DockerContainer(object):
         self.global_config = global_config
         self._update_start_config()
         self._update_creation_config()
-        self.daemon = daemon
-        self.e2e_checks = e2e_checks
-        self.jobs = jobs
-        self.tests = tests
+        self.test_config = kwargs
         log.debug("Initialized docker container {}".format(name))
 
     def _buildpath(self):
@@ -553,55 +550,65 @@ def run_configuration(
     for item in order_list:
 
         name, orders = item.items()[0]
-        c = configurations.get(name, {})
-        if not c and name != 'host':
-            raise ValueError(
-                "Could not find a configuration for container {}".format(name))
-        cmd = orders['command']
+        cmd, container = prepare_job(
+            name, dc, unitcommand, global_config, orders, configurations)
 
-        container = DockerContainer(
-            dc, name, global_config=global_config, unitname=unitcommand, **c)
+        run_job(cmd, container, orders)
 
-        timeout = orders.pop('timeout', 10)
-        wait_time = orders.pop('wait', 0)
 
-        log.info('Executing step {} on {}'.format(cmd, name))
-        if cmd == 'build':
-            container.build_image()
-        elif cmd == 'create':
-            container.create()
-        elif cmd == 'start':
-            restart = orders.pop('restart', False)
-            attach = orders.pop('attach', False)
-            container.start(restart, attach, timeout)
-        elif cmd == 'restore':
-            restore_dir = os.path.abspath(orders.get('restore_dir', '.'))
-            restore_name = orders.get('restore_name', 'backup')
-            container.restore(restore_dir, restore_name)
-        elif cmd == 'backup':
-            backup_dir = os.path.abspath(orders.get('backup_dir', '.'))
-            source_dir = orders.get('source', None)
-            backup_name = orders.get('backup_name', 'backup')
-            overwrite = orders.get('overwrite', False)
-            container.backup(source_dir, backup_dir, backup_name, overwrite)
-        elif cmd == 'stop':
-            container.stop(timeout)
-        elif cmd == 'remove_image':
-            force = orders.pop('force', False)
-            noprune = orders.pop('noprune', False)
-            container.remove_image(force, noprune)
-        elif cmd == 'remove':
-            v = orders.pop('v', False)
-            container.remove(v, timeout)
-        elif cmd == 'execute':
-            shell = orders.pop('shell', False)
-            binds = orders.pop('binds', {})
-            container.execute(orders['run'], shell, binds)
-        else:
-            raise ValueError(
-                "Invalid command {} for container {}".format(cmd, name))
+def prepare_job(name, dc, unitcommand, global_config, orders, configurations):
+    c = configurations.get(name, {})
+    if not c and name != 'host':
+        raise ValueError(
+            "Could not find a configuration for container {}".format(name))
+    cmd = orders['command']
 
-        time.sleep(wait_time)
+    container = DockerContainer(
+        dc, name, global_config=global_config, unitname=unitcommand, **c)
+    return cmd, container
+
+
+def run_job(cmd, container, orders):
+    timeout = orders.pop('timeout', 10)
+    wait_time = orders.pop('wait', 0)
+
+    log.info('Executing step {} on {}'.format(cmd, container.name))
+    if cmd == 'build':
+        container.build_image()
+    elif cmd == 'create':
+        container.create()
+    elif cmd == 'start':
+        restart = orders.pop('restart', False)
+        attach = orders.pop('attach', False)
+        container.start(restart, attach, timeout)
+    elif cmd == 'restore':
+        restore_dir = os.path.abspath(orders.get('restore_dir', '.'))
+        restore_name = orders.get('restore_name', 'backup')
+        container.restore(restore_dir, restore_name)
+    elif cmd == 'backup':
+        backup_dir = os.path.abspath(orders.get('backup_dir', '.'))
+        source_dir = orders.get('source', None)
+        backup_name = orders.get('backup_name', 'backup')
+        overwrite = orders.get('overwrite', False)
+        container.backup(source_dir, backup_dir, backup_name, overwrite)
+    elif cmd == 'stop':
+        container.stop(timeout)
+    elif cmd == 'remove_image':
+        force = orders.pop('force', False)
+        noprune = orders.pop('noprune', False)
+        container.remove_image(force, noprune)
+    elif cmd == 'remove':
+        v = orders.pop('v', False)
+        container.remove(v, timeout)
+    elif cmd == 'execute':
+        shell = orders.pop('shell', False)
+        binds = orders.pop('binds', {})
+        container.execute(orders['run'], shell, binds)
+    else:
+        raise ValueError(
+            "Invalid command {} for container {}".format(cmd, container.name))
+
+    time.sleep(wait_time)
 
 
 # vim:set ft=python sw=4 et spell spelllang=en:
