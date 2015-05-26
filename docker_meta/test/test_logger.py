@@ -60,7 +60,7 @@ def test_log_configuration():
     assert config['handlers']['error_stream']['stream'] == sys.stderr
 
     config = _get_logger_configuration(
-        infofile='file.log', errorfile='file.err')
+        infofiles='file.log', errorfiles='file.err')
     assert config['handlers']['info_stream']['filename'] == 'file.log'
     assert config['handlers']['error_stream']['filename'] == 'file.err'
 

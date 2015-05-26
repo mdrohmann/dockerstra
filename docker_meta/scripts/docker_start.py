@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
     configure_logger(
         debug=args.debug, verbosity=args.verbose,
-        errorfile=args.errfile, infofile=args.infofile)
+        errorfiles=args.errfile, infofiles=args.infofile)
 
     # we prefer the following syntax for refactoring purposes.
     log = logging.getLogger(docker_meta.__name__)
