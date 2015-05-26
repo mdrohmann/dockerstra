@@ -1,12 +1,200 @@
 # -*- coding: utf-8 -*-
 
+import pytest
+from docker_meta.test_runner import (
+    SuiteFactory, Suite, SingleCase, SetupTeardownCase, DaemonCase)
+from docker_meta.configurations import Configuration
+from docker_meta.logger import last_error_line, configure_logger
 
-def test_tempid_injection():
+
+configure_logger(verbosity=0, test=1)
+
+
+class TestConfiguration(object):
     """
-    makes sure, that the tempid is injected in the environment of the called
-    units...
+    all tests in here, are based on a dummy scenario.  I will try not to use
+    the docker.Client, but instead monkeypatch it...
     """
-    assert False
+
+    @staticmethod
+    def _get_container_keys(tempid):
+        keys = ['container1', 'daemon_container']
+        if tempid:
+            return ('{}_{}'.format(n, tempid) for n in keys)
+        else:
+            return keys
+
+    @classmethod
+    def get_order_list(cls, tempid):
+        k1, k2 = cls._get_container_keys(tempid)
+        order_list = [{
+            k1: {
+                'command': 'create'}
+            }, {
+            k1: {
+                'command': 'start'}
+            }, {
+            k2: {
+                'command': 'start'}
+            }, {
+            k1: {
+                'command': 'stop'}
+            }
+        ]
+        return order_list
+
+    @classmethod
+    def get_configurations(cls, tempid):
+        k1, k2 = cls._get_container_keys(tempid)
+        configurations = {
+            k1: {
+                'jobs': {
+                    'default_test': {
+                        'args': ['unit/start', 'test', 'default'],
+                        'type': 'junit',
+                        'gather_files': ['junit-*.xml', 'coverage_html/*'],
+                    },
+                    'check_python_version': {
+                        'args':
+                            ['unit/start', 'single', 'python', '--version'],
+                        'type': 'single',
+                        'match': 'Python 2\.7\.[1-9]*'
+                    },
+                    'check_for_certifi': {
+                        'args': ['unit/start', 'single', 'python' '-mcertifi'],
+                        'type': 'single',
+                        'exit_code': 0,
+                    },
+                },
+            },
+            k2: {
+                'daemon': {
+                    'port_open': {
+                        'type': 'GET',
+                        'url':
+                            '[[.NetworkSettings.IPAddress]](daemon_container)',
+                        'status': 200,
+                        'match': 'happy to talk to you',
+                    },
+                    'dns_resolution': {
+                        'type': 'GET',
+                        'url': 'http://daemon_container.local',
+                        'status': 200,
+                    },
+                    'ssl_request': {
+                        'type': 'GET',
+                        'url': 'https://daemon_container.local',
+                        'status': 304,
+                        'error_match': 'self-signed certificate',
+                    },
+                },
+                'jobs': {
+                    'e2e_test': {
+                        'args': ['unit/start:e2e'],
+                        'type': 'junit',
+                        'gather_files': ['junit-*.xml'],
+                        },
+                },
+            },
+        }
+        return configurations
+
+    @classmethod
+    def monkey_read_configuration(cls, config):
+        tempid = config.environment.get('tempid', None)
+        return (
+            f(tempid) for f in [cls.get_configurations, cls.get_order_list])
+
+    @pytest.fixture()
+    def dummy_config(self, tmpdir, monkeypatch):
+        monkeypatch.setattr(
+            Configuration, 'read_unit_configuration',
+            lambda cinst, *args: self.monkey_read_configuration(cinst))
+
+        config = Configuration(str(tmpdir))
+        return config
+
+    @pytest.fixture()
+    def suite_factory(self, dummy_config):
+        suite_factory = SuiteFactory('unit/test', dummy_config, None)
+        return suite_factory
+
+    def test_tempid(self, suite_factory):
+        tempid = suite_factory.tempid()
+        assert len(tempid) == 10
+        assert suite_factory.tempid(True) == 'unit/test_{}'.format(tempid)
+
+    def test_environment_injection(self, suite_factory, dummy_config):
+        """
+        makes sure, that the tempid is injected in the environment of the
+        called units...
+        """
+        configurations_pre = list(dummy_config.read_unit_configuration())[0]
+        tempid_container = 'container1_{}'.format(suite_factory.tempid())
+        assert 'container1' in configurations_pre
+        assert tempid_container not in configurations_pre
+
+        suite_factory.inject_tempid()
+        configurations_pre = list(dummy_config.read_unit_configuration())[0]
+        assert 'container1' not in configurations_pre
+        assert tempid_container in configurations_pre
+
+    def test_collect_setup(self, suite_factory, dummy_config):
+        configurations, order_list = dummy_config.read_unit_configuration(
+            'unit/start')
+        suite_factory.collect_setup(configurations, order_list)
+
+        assert last_error_line()[0]
+
+        suites = suite_factory.suites
+        assert len(suites) == 1
+        cases = suites[0].cases
+        assert len(cases) == 4
+        for case in cases:
+            assert type(case) == SetupTeardownCase
+            case_config = case.as_dict()
+            if case_config['cmd'] == 'start':
+                assert not case_config['startup']['tty']
+                assert not case_config['startup']['stdin_open']
+                assert case_config['orders']['attach']
+
+    @pytest.mark.parametrize(
+        'f,num_suites,num_cases,cls,container,names', [
+            (SuiteFactory.collect_single_jobs, 2, 3,
+                SingleCase,
+                'container1', [
+                    'default_test',
+                    'check_python_version',
+                    'check_for_certifi']),
+            (SuiteFactory.collect_daemon_requests, 1, 3,
+                DaemonCase,
+                'daemon_container',
+                [
+                    'port_open',
+                    'dns_resolution',
+                    'ssl_request']),
+            ], ids=['jobs', 'daemons'])
+    def test_collect_jobs(
+            self, suite_factory, dummy_config,
+            f, num_suites, num_cases, cls, container, names):
+
+        configurations, order_list = dummy_config.read_unit_configuration(
+            'unit/start')
+        f(suite_factory, configurations)
+
+        suites = suite_factory.suites
+        assert len(suites) == num_suites
+
+        # test only one configuration
+        cases = [s for s in suites if s.name.startswith(container)][0].cases
+        assert len(cases) == num_cases
+
+        for case in cases:
+            assert type(case) == cls
+
+        casedicts = [case.as_dict() for case in cases]
+        names = [c['testcase_name'] for c in casedicts]
+        assert (set(names) == set(names))
 
 
 def test_junit_generation():
