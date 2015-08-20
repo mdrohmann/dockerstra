@@ -3,11 +3,52 @@
 import pytest
 from docker_meta.test_runner import (
     SuiteFactory, Suite, SingleCase, SetupTeardownCase, DaemonCase)
+from docker_meta.container import DockerContainer
 from docker_meta.configurations import Configuration
-from docker_meta.logger import last_error_line, configure_logger
+from docker_meta.logger import configure_logger
 
 
 configure_logger(verbosity=0, test=1)
+
+
+class TestRunning(object):
+    """
+    all tests in here are based on a dummy configuration of Suites with test
+    cases.
+    """
+
+    setup_case = SetupTeardownCase(
+        DockerContainer(None, 'container1'),
+        'start', {})
+
+    daemon_case = DaemonCase('daemon_container', 'port_open', {
+        'url': 'localhost:1234',
+        'status': 200,
+        'match': 'happy to talk to you'
+        })
+
+    junit_case = SingleCase('container1', 'default_test', {
+        'unitcommand': 'unit/start',
+        'args': ['test', 'default'],
+        'gather_files': ['junit-*.xml', 'coverage_html/*'],
+        })
+
+    single_case = SingleCase('container1', 'check_python_version', {
+        'args': ['single', 'python', '-mcertifi'],
+        'match': 'Python 2\.7\.[1-9]*',
+        })
+
+    all_cases = [
+        setup_case,
+        daemon_case,
+        junit_case,
+        single_case,
+    ]
+
+    suite = Suite('dummy', all_cases)
+
+    def test_run_suite(self):
+        self.suite.run_all()
 
 
 class TestConfiguration(object):
@@ -43,26 +84,42 @@ class TestConfiguration(object):
         ]
         return order_list
 
+    def get_purge_orders(cls, tempid):
+        k1, k2 = cls._get_container_keys(tempid)
+        order_list = [{
+            k1: {
+                'command': 'stop'}}, {
+            k1: {
+                'command': 'remove'}}, {
+            k1: {
+                'command': 'remove_image'}}, {
+            k2: {
+                'command': 'stop'}}, {
+            k2: {
+                'command': 'remove'}},
+            ]
+        return order_list
+
     @classmethod
-    def get_configurations(cls, tempid):
+    def get_configurations(cls, tempid, tag_tempid=False):
         k1, k2 = cls._get_container_keys(tempid)
         configurations = {
             k1: {
+                'build': {
+                    'tag': 'some_tag_{}'.format(tag_tempid and tempid or ''),
+                },
                 'jobs': {
                     'default_test': {
                         'args': ['unit/start', 'test', 'default'],
-                        'type': 'junit',
                         'gather_files': ['junit-*.xml', 'coverage_html/*'],
                     },
                     'check_python_version': {
                         'args':
                             ['unit/start', 'single', 'python', '--version'],
-                        'type': 'single',
                         'match': 'Python 2\.7\.[1-9]*'
                     },
                     'check_for_certifi': {
                         'args': ['unit/start', 'single', 'python' '-mcertifi'],
-                        'type': 'single',
                         'exit_code': 0,
                     },
                 },
@@ -139,17 +196,57 @@ class TestConfiguration(object):
         assert 'container1' not in configurations_pre
         assert tempid_container in configurations_pre
 
+    def test_collect_cases(self, suite_factory, monkeypatch):
+        tempid = suite_factory.tempid()
+        monkeypatch.setattr(
+            Configuration, 'modify_order_list',
+            lambda *args: (
+                self.get_configurations(tempid, False),
+                self.get_purge_orders(tempid)))
+
+        suite_factory.collect_cases()
+        suites = suite_factory.suites
+        assert len(suites) == 5
+
+    @pytest.mark.parametrize(
+        'use_tempid, tag_tempid, num_cases', [
+            (True, True, 5),
+            (True, False, 4),
+            (False, True, 0),
+            ], ids=['with_tempids', 'build_without_tempid', 'no_tempids'])
+    def test_collect_teardown(
+            self, suite_factory, dummy_config, monkeypatch,
+            use_tempid, tag_tempid, num_cases):
+
+        if use_tempid:
+            tempid = suite_factory.tempid()
+        else:
+            tempid = None
+        monkeypatch.setattr(
+            Configuration, 'modify_order_list',
+            lambda *args: (
+                self.get_configurations(tempid, tag_tempid),
+                self.get_purge_orders(tempid)))
+        configurations, order_list = dummy_config.read_unit_configuration(
+            'unit/start')
+        suite_factory.collect_teardown(configurations, order_list)
+
+        suites = suite_factory.suites
+        assert len(suites) == 1
+        cases = suites[0].cases
+        assert len(cases) == num_cases
+        for case in cases:
+            assert type(case) == SetupTeardownCase
+
     def test_collect_setup(self, suite_factory, dummy_config):
         configurations, order_list = dummy_config.read_unit_configuration(
             'unit/start')
         suite_factory.collect_setup(configurations, order_list)
 
-        assert last_error_line()[0]
-
         suites = suite_factory.suites
         assert len(suites) == 1
         cases = suites[0].cases
-        assert len(cases) == 4
+        assert len(cases) == 3
         for case in cases:
             assert type(case) == SetupTeardownCase
             case_config = case.as_dict()

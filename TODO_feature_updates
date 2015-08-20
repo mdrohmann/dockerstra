@@ -1,0 +1,23 @@
+@@ -264,7 +338,139 @@ between ``data`` and ``service`` directories, but data images in general only
+ contain volumes that can be mounted in a container derived from a service
+ image.
+ 
++
++Updates
++*******
++
++If the unit directory has a command ``unit/update``, it should execute a script
++to create a temporary container.  As the last order in this list, you can
++specify a command called ``tests`` on the virtual container ``host``, with an
++argument list called ``tests`` as well.  This list comprises command line
++arguments for test runs, that will be executed in this step.  This way, the
++``unit/update`` command is only considered successful if all the tests work
++after updating the image.  This way, you can make sure, that the tag ``latest``
++is only applied if the update worked.
++
++For every ``unit/update`` command, |project| automatically generates a
++``unit/upgrade`` command, that re-creates and re-starts all running containers
++that depend on the updated image.
++
++.. seealso:: :ref:`variants`
++

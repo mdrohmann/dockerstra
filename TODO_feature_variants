@@ -1,0 +1,16 @@
++Variants
++++++++++
++
++There is one argument that is valid of all commands in the list of orders,
++called ``variants``.  This should get a list of strings.  If there are variants
++specified in a configuration file, then the ``unit/command`` can be filtered in
++the following way ``unit/command:variant1:variant2:...:variantn``.  This
++selects only the orders tagged with the specified variant strings.  You could
++use this, to define a minimal set of development servers for example.
+ 
+ .. _environments:
+ 
+@@ -251,6 +299,32 @@ file, for example.  Some environment variables are added automatically, most
+ importantly the variable ``{{DOCKERSTRA_CONF}}`` pointing to the base directory
+ of the configuration file structure.
+ 

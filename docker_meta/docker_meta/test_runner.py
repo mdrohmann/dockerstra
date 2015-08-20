@@ -1,17 +1,19 @@
 # -*- coding: utf-8 -*-
-
 import hashlib
 import logging
+import os
 import platform
 import time
 import traceback
 from cStringIO import StringIO
 
 from junit_xml import TestCase, TestSuite
-from docker_meta import __name__ as docker_meta_name
-from docker_meta.utils import get_timestamp
+
+from docker_meta import __name__ as docker_meta_name, logger
 from docker_meta.container import (prepare_job, run_job)
-from docker_meta import logger
+from docker_meta.utils import get_timestamp
+from docker_meta.configurations import Configuration
+
 
 log = logging.getLogger(docker_meta_name)
 
@@ -27,7 +29,11 @@ class CaseBase(object):
         self.classname = classname
 
     def _update_logger(self, stdout, stderr):
-        logger.configure_logger(stdout, stderr, verbosity=2)
+        logger.update_logger(
+            infofiles=[stdout], errorfiles=[stderr], verbosity=2)
+
+    def _reset_logger(self):
+        logger.reset_logger()
 
     def as_dict(self):
         """
@@ -66,6 +72,7 @@ class CaseBase(object):
 
         failure = None
         stdout, stderr = StringIO(), StringIO()
+        self._update_logger(stdout, stderr)
 
         start = time.time()
         try:
@@ -79,6 +86,8 @@ class CaseBase(object):
                 "FAILURE: test return with error code: {}\n{}"
                 .format(e.error_code, str(e)),
                 traceback.format_exc(3))
+
+        self._reset_logger()
         end = time.time()
         elapsed = (end - start)
 
@@ -116,13 +125,97 @@ class DaemonCase(CaseBase):
 class SingleCase(CaseBase):
     """
     a test case for default single job
+
+    The scenarios that we want to achieve here are:
+
+    1. Running an end-to-end test, by starting a temporary container.  Some
+    results stored in this container, need to be re-covered before deletion.
+    2. Running a temporary container for CI tests.  The virtual environment
+       might be changed here.  So we need a temporary virtual environment to
+       set-up here.
+    3. Running a temporary container to check for the existence of files in a
+    stopped or running container.
+
+    That is not too much...
+
+    Basically what this case needs to do is:
+
+    1. get a unit configuration, orderlist tuple for the container with the
+       provided arguments.
+    2. strip both of them to the ONE configuration for this container and the
+       list of orders containing only 'start' and 'remove'.  Those could be
+       SetupTeardownCases again.
+    3. change the container name to _jobname_tempid
+    4. prepare the job (crate a DockerContainer)
+    5. run the job
+    6. collect files
+    7. register teardown case in suite.
     """
 
-    def __init__(self, container, name, config):
-        self.container_name = container
-        self.config = config
-
+    def __init__(
+            self, container, name, unitcommand,
+            args=[], gather_files=[], match=[], exitcode=None,
+            resultdir=None):
+        """
+        constructor
+        """
         CaseBase.__init__(self, name, 'single')
+        self.container_name = container
+        self.unitcommand = unitcommand
+        self.args = args
+        self.gather_files = gather_files
+        self.match = match
+        self.exitcode = exitcode
+        if not resultdir:
+            resultdir = os.path.join(os.getcwd(), 'results')
+        self.resultdir = resultdir
+
+    def get_configuration(self, basedir):
+        jobconfig = Configuration(basedir, self.args)
+        configurations, order_list = (
+            jobconfig.read_unit_configuration(self.unitcommand))
+        return jobconfig, configurations, order_list
+
+    def strip_and_update_configuration_to_container(
+            self, configurations, order_list, tempid):
+
+        suffix = '{}_{}'.format(self.name, tempid)
+        new_name = '{}_{}'.format(self.container_name, suffix)
+        new_configurations = {new_name: configurations[self.container_name]}
+        start_orders = {
+            'command': 'start',
+            'restart': True,
+            'attach': True,
+        }
+        return new_name, new_configurations, start_orders
+
+    def get_docker_container(
+            self, new_name, dc, jobconfig, order_list, configurations):
+
+        cmd, container = prepare_job(
+            new_name, dc, jobconfig, order_list, configurations)
+
+        return cmd, container
+
+    def collect_files(self, docker_container):
+        for files in self.gather_files:
+            docker_container.copy(files, self.resultdir)
+
+    def prepare(self, global_config, tempid, dc):
+        # get unit configuration, order
+        jobconfiguration, configurations, order_list = (
+            self.get_configuration(global_config.basedir))
+
+        new_name, new_configurations, start_orders = (
+            self.strip_and_update_configuration_to_container(
+                configurations, order_list, tempid))
+
+        self.cmd, self.container = self.get_docker_container(
+            new_name, dc, jobconfiguration,
+            start_orders, new_configurations)
+
+    def run_test(self):
+        run_job(self.cmd, self.container, self.orders)
 
     def as_dict(self):
         config = CaseBase.as_dict(self)
@@ -131,9 +224,6 @@ class SingleCase(CaseBase):
             'request_config': self.config
         })
         return config
-
-    def run_test(self):
-        raise NotImplementedError()
 
 
 class SetupTeardownCase(CaseBase):
@@ -149,9 +239,7 @@ class SetupTeardownCase(CaseBase):
         self.orders = orders
         self.fix_startup()
 
-    def run_test(self, stdout, stderr):
-        self._update_logger(stdout, stderr)
-
+    def run_test(self):
         run_job(self.cmd, self.container, self.orders)
 
     def as_dict(self):
@@ -205,28 +293,30 @@ class SuiteFactory(object):
         for item in order_list:
             name, orders = item.items()[0]
             cmd, container = prepare_job(
-                name, self.dc, self.unitcommand, self.config,
-                orders, configurations)
+                name, self.dc, self.config, orders, configurations)
 
-            # filter the clean-up phase, we will remove everything tagged with
-            # a tempid and stop the rest.
-            if cmd in ['stop', 'remove', 'remove_image']:
-                log.warn(
-                    "Are you sure, that you want to execute a {} order "
-                    "in the test-scenario?".format(cmd))
+            # filter cleanup commands in the set-up phase
+            if (typename == 'setup'
+                    and cmd in ['stop', 'remove', 'remove_image']):
+                continue
 
-            case = SetupTeardownCase(container, cmd, orders, 'typename')
+            case = SetupTeardownCase(container, cmd, orders, typename)
             cases.append(case)
 
         self.suites.append(Suite(self.unitcommand, cases))
 
-    def create_cleanup(self, configurations, order_list):
+    def collect_teardown(self, configurations, order_list):
         """
-        creates the cleanup - list of orders for the test runs
+        creates the teardown testsuite
+
+        This is based on the purge script of course...
         """
 
+        unit, command, modes = self.config.split_unit_command(self.unitcommand)
+        purge_variant = ':'.join(['purge'] + modes)
         new_configurations, new_order_list = (
-            self.config.modify_order_list(configurations, order_list, 'purge'))
+            self.config.modify_order_list(
+                configurations, order_list, purge_variant))
 
         def _filter(item):
             name, orders = item.items()[0]
@@ -242,7 +332,7 @@ class SuiteFactory(object):
             return False
 
         res_order_list = [item for item in new_order_list if _filter(item)]
-        self.collect_setup(new_configurations, res_order_list)
+        self.collect_setup(new_configurations, res_order_list, 'teardown')
 
     def collect_daemon_requests(self, configurations):
         self._collect_job(configurations, 'daemon', DaemonCase)
@@ -285,7 +375,7 @@ class SuiteFactory(object):
 
         self.collect_single_jobs(configurations)
 
-        self.create_cleanup(configurations, order_list)
+        self.collect_teardown(configurations, order_list)
 
     def inject_tempid(self):
         self.config.update_environment(

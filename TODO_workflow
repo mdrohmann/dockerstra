@@ -1,0 +1,45 @@
+This is how i want the workflow for a development project to look like:
+
+Continuous integration
+----------------------
+
+1. Continuously run 'unit/test:default' for CI on every change in the code.
+1b. Daily or on demand run 'unit/test:slow' for slow tests, that should be kept
+    separately (eg., with pytest flags)
+
+2. Weekly/daily or manually manage the virtualenvironments
+
+    This will be accompanied by a 'unit/test -x update_test update'
+
+    1. Back it up
+    2. Check that the upgrade would work
+    3. Clean-up old backups of virtual-environments (only two should be kept)
+
+    Note: this is part of CI
+
+3. Weekly/daily or manually update the docker images
+
+    This will probably be initiated by a unit/test:update
+
+    1. Tag them with a combination YY.NUMBER *before* every update
+    2. Only change the **latest** tag, after all tests depending on the image
+       are successful.  (needs to be defined somewhere)
+    3. clean-up very old tags
+
+4. Weekly/daily run end-to-end tests on the whole thing.  (Compare with
+staging.)
+
+Staging
+-------
+
+If a new feature needs to be deployed, every image, every virtual environment
+and every repository workspace is tagged with a tag 'stage.NUMBER'.
+
+All dependent unit/test:default tests are run.  After the numbers have been
+incremented a few times (bugfixing), the tagging is changed to 'deploy.NUMBER'
+
+This is a manual process.  The tests are finally run as 'unit/test:production',
+at least twice.
+
+A staging script needs to be available, that does all the update steps in one
+go, and succeed twice under test conditions, before we deploy.

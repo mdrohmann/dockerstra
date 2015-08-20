@@ -1,0 +1,27 @@
+TODO:
+1. make dockerstra a python_host
+2. make it a jenkins test
+
+- finish karma-test suite
+- configure nginx server for juergen_startup
+- add moneymanager configuration
+- test python_hosts
+- configure jenkins server for juergen_startup
+- test substitutions...
+
+
+- replace gitolite / cgit with gitlab installation (NO!!!)
+- add the periscope containers for vim and browser-sync
+- catatnight / postfix
+- rainloop webserver ahmet2mir / rainloop
+- dinkel/spamassassin
+- jprjr/ubuntu-dovecot or classcat/dovecot
+- look into fail2ban
+
+
+DONE:
+
+- restart dev-server
+- automatic generation of unit/commands
+- write usage documentation
+- recursive substitutions

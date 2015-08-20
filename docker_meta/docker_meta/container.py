@@ -129,11 +129,10 @@ class DockerContainer(object):
 
     def __init__(
             self, dc, name, creation={}, startup={}, build={},
-            global_config=Configuration(), unitname='unknown/unknown',
+            global_config=Configuration(),
             **kwargs):
 
         self.dc = dc
-        self.unitname = unitname   # TODO: this has been added to the signature
         self.name = name
         self.creation = creation
         self.startup = startup
@@ -551,12 +550,12 @@ def run_configuration(
 
         name, orders = item.items()[0]
         cmd, container = prepare_job(
-            name, dc, unitcommand, global_config, orders, configurations)
+            name, dc, global_config, orders, configurations)
 
         run_job(cmd, container, orders)
 
 
-def prepare_job(name, dc, unitcommand, global_config, orders, configurations):
+def prepare_job(name, dc, global_config, orders, configurations):
     c = configurations.get(name, {})
     if not c and name != 'host':
         raise ValueError(
@@ -564,7 +563,7 @@ def prepare_job(name, dc, unitcommand, global_config, orders, configurations):
     cmd = orders['command']
 
     container = DockerContainer(
-        dc, name, global_config=global_config, unitname=unitcommand, **c)
+        dc, name, global_config=global_config, **c)
     return cmd, container
 
 
